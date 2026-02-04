@@ -6842,9 +6842,9 @@
       });
 
       document.addEventListener("click", (e) => {
-        if (e.target.closest(".overview-detail-menu-wrap, .payment-plan-menu-wrap, .change-item-menu-wrap")) return;
-        document.querySelectorAll(".overview-detail-menu.dropdown-menu.open, .payment-plan-menu.dropdown-menu.open, .change-item-menu.dropdown-menu.open").forEach(m => m.classList.remove("open"));
-        document.querySelectorAll(".overview-detail-menu-btn[aria-expanded=true], .payment-plan-menu-btn[aria-expanded=true], .change-item-menu-btn[aria-expanded=true]").forEach(b => b.setAttribute("aria-expanded", "false"));
+        if (e.target.closest(".overview-detail-menu-wrap, .payment-plan-menu-wrap, .change-item-menu-wrap, .loan-detail-menu-wrap")) return;
+        document.querySelectorAll(".overview-detail-menu.dropdown-menu.open, .payment-plan-menu.dropdown-menu.open, .change-item-menu.dropdown-menu.open, .loan-detail-menu.open").forEach(m => m.classList.remove("open"));
+        document.querySelectorAll(".overview-detail-menu-btn[aria-expanded=true], .payment-plan-menu-btn[aria-expanded=true], .change-item-menu-btn[aria-expanded=true], .loan-detail-menu-btn[aria-expanded=true]").forEach(b => b.setAttribute("aria-expanded", "false"));
       });
 
       document.getElementById("confirm-delete-btn").addEventListener("click", async () => {
