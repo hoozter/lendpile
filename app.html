@@ -151,29 +151,41 @@
       display: block;
       overflow: visible;
     }
+    .loan-field-wrap { position: relative; display: block; }
+    .locked-field-container input,
+    .locked-field-container select,
+    .unlocked-field-container input,
+    .unlocked-field-container select {
+      padding-right: 40px;
+      box-sizing: border-box;
+      height: 2.5rem;
+      min-height: 2.5rem;
+    }
+    .locked-field-container::after,
+    .unlocked-field-container::after {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      margin-top: -15px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+      font-size: 18px;
+      text-align: center;
+      pointer-events: none;
+    }
     .locked-field-container::after {
       content: 'lock';
       font-family: 'Material Icons';
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
       color: var(--button-delete);
-      font-size: 18px;
-      pointer-events: none;
     }
     .unlocked-field-container::after {
       content: 'lock_open';
       font-family: 'Material Icons';
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
       color: var(--primary-color);
-      font-size: 18px;
-      pointer-events: none;
     }
-    .form-row.locked-field-container { display: flex; align-items: center; }
+    .locked-field-container,
+    .unlocked-field-container { display: flex; align-items: center; }
     #loanStartDate-container {
       position: relative;
     }
@@ -1832,29 +1844,33 @@
           <h4 class="modal-section-title" data-translate="loanDetails">Låneuppgifter</h4>
           <div class="form-row">
             <label for="loanName" data-translate="loanName">Lånenamn:</label>
-            <input type="text" id="loanName" required placeholder="Ex. Bolån" />
+            <div id="loanName-container" class="loan-field-wrap">
+              <input type="text" id="loanName" required placeholder="Ex. Bolån" />
+            </div>
           </div>
           <div class="form-row">
             <label for="loanStartDate" data-translate="startDate">Startdatum:</label>
-            <div id="loanStartDate-container" class="locked-field-container">
+            <div id="loanStartDate-container" class="locked-field-container loan-field-wrap">
               <input type="date" id="loanStartDate" required placeholder="YYYY-MM-DD" disabled />
             </div>
           </div>
           <div class="form-row">
             <label for="loanInitialAmount" data-translate="loanAmount">Ursprungligt lånebelopp:</label>
-            <div class="locked-field-container">
+            <div id="loanInitialAmount-container" class="locked-field-container loan-field-wrap">
               <input type="number" id="loanInitialAmount" required min="0" placeholder="Ex. 300000" disabled />
             </div>
           </div>
           <div class="form-row">
             <label for="loanCurrency" data-translate="currency">Valuta:</label>
-            <select id="loanCurrency" required>
+            <div id="loanCurrency-container" class="loan-field-wrap">
+              <select id="loanCurrency" required>
               <option value="SEK">SEK</option>
               <option value="EUR">EUR</option>
               <option value="USD">USD</option>
               <option value="NOK">NOK</option>
               <option value="DKK">DKK</option>
             </select>
+            </div>
           </div>
           <div class="form-row hidden" id="loan-initial-interest-row">
             <label for="loanInitialInterestRate" data-translate="initialInterestRate">Initial interest rate (%)</label>
@@ -4142,8 +4158,8 @@
             if (item && item._shared) {
               if (action === "edit") {
                 UIHandler.currentShare = item._shared;
-                UIHandler.currentDetailLoanIndex = null;
-                UIHandler.showSharedLoan();
+                if (item._shared.share?.permission === "view") FormHandler.openLoanModalForSharedViewOnly();
+                else FormHandler.openLoanModalForSharedLoan();
                 return;
               }
               if (action === "duplicate") {
@@ -4196,7 +4212,7 @@
       async duplicateSharedLoanToMyList() {
         const loan = this.getSharedLoanForDisplay();
         if (!loan) return;
-        const copy = { ...loan, id: crypto.randomUUID() };
+        const copy = { ...loan, id: crypto.randomUUID(), name: (LanguageService.translate("copyOf") || "Copy of {name}").replace(/\{name\}/g, loan.name || "") };
         const current = StorageService.load("loanData") || [];
         const updated = [...current, copy];
         StorageService.save("loanData", updated);
@@ -5426,7 +5442,7 @@
         UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
         ["loanName", "loanCurrency"].forEach(id => {
           const el = document.getElementById(id);
-          if (el) el.closest(".form-row")?.classList.add("locked-field-container");
+          if (el) el.closest(".loan-field-wrap")?.classList.add("locked-field-container");
         });
         UIHandler.showModal("loan-modal");
       },
@@ -5436,7 +5452,7 @@
         const source = loans[index];
         const copy = JSON.parse(JSON.stringify(source));
         copy.id = crypto.randomUUID();
-        copy.name = (LanguageService.translate("copyOf") || "Copy of").replace("{name}", source.name);
+        copy.name = (LanguageService.translate("copyOf") || "Copy of {name}").replace(/\{name\}/g, source.name || "");
         loans.push(copy);
         StorageService.save("loanData", loans);
         if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
@@ -6126,9 +6142,7 @@
           UIHandler.showModal("mfa-challenge-modal");
           window._mfaChallengeResolve = async () => {
             const syncedData = await SyncService.loadData();
-            if (syncedData && syncedData.length > 0) {
-              StorageService.save("loanData", syncedData);
-            }
+            StorageService.save("loanData", syncedData ?? []);
             const { shares: sharesReceived } = await ShareService.listSharesReceived();
             UIHandler.sharesReceived = sharesReceived || [];
             UIHandler.init();
@@ -6142,9 +6156,7 @@
           };
         } else {
           const syncedData = await SyncService.loadData();
-          if (syncedData && syncedData.length > 0) {
-            StorageService.save("loanData", syncedData);
-          }
+          StorageService.save("loanData", syncedData ?? []);
         }
       }
       async function tryRedeemPendingShare() {
@@ -6161,6 +6173,8 @@
         }
       }
       if (!needMfaChallenge) {
+        const syncedData = await SyncService.loadData();
+        StorageService.save("loanData", syncedData ?? []);
         const { shares: sharesReceived } = await ShareService.listSharesReceived();
         UIHandler.sharesReceived = sharesReceived || [];
         UIHandler.init();
@@ -6189,6 +6203,7 @@
         profileDropdown.classList.remove("open");
         await AuthService.signOut();
         localStorage.removeItem("offlineMode");
+        StorageService.save("loanData", []);
         location.reload();
       });
       document.getElementById("change-password-cancel").addEventListener("click", () => {
@@ -7012,14 +7027,11 @@
     async function onLoginSuccess() {
       document.getElementById("login-modal").style.display = "none";
       UIHandler.restoreBodyScroll();
+      const syncedData = await SyncService.loadData();
+      StorageService.save("loanData", syncedData ?? []);
       const { shares: sharesReceived } = await ShareService.listSharesReceived();
       UIHandler.sharesReceived = sharesReceived || [];
       UIHandler.init();
-      const syncedData = await SyncService.loadData();
-      if (syncedData && syncedData.length > 0) {
-        StorageService.save("loanData", syncedData);
-        UIHandler.renderLoans();
-      }
       await updateUserHeader();
       await tryRedeemPendingShare();
       UIHandler.checkTransferOffers();
