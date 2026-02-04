@@ -10,7 +10,7 @@ A clear, reliable loan and amortization tracker. Plan loans you borrow or lend, 
 - Track both sides: borrowing (what you owe) and lending (what’s owed to you).
 - Export and import your data; use with or without an account.
 - Sign in to sync across browsers or devices; 2FA and recovery email supported.
-- Share a loan via link; the recipient sees who shared it and which loan before signing in.
+- Share a loan via link; the recipient sees who shared it and which loan before signing in. Shared loans stay in your list (one source of truth); the recipient can revoke the share from their side. The loan list shows type badges (Borrowing / Lending) and is grouped by type.
 
 Lendpile is built with care. The calculations are there to help you plan and understand—not to replace your lender or adviser. For important decisions, confirm the numbers with your bank or a qualified professional. See [privacy.html](privacy.html) for the full disclaimer and privacy details.
 

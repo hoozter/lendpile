@@ -780,6 +780,23 @@
       border-color: var(--primary-color);
     }
     .loan-card-compact-info { flex: 1; min-width: 0; }
+    .loan-card-type-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      background: var(--input-background);
+      color: var(--text-color);
+      opacity: 0.9;
+    }
+    .loan-card-type-badge[data-type="lend"] {
+      background: rgba(76, 175, 80, 0.2);
+      color: var(--text-color);
+    }
     .loan-card-compact-info h3 { margin: 0 0 4px 0; font-size: 1.1rem; }
     .loan-card-compact-meta {
       display: flex;
@@ -1984,6 +2001,19 @@
       </div>
     </div>
   </div>
+
+  <!-- REMOVE SHARED LOAN FROM LIST MODAL -->
+  <div id="remove-shared-loan-modal" class="confirm-modal modal">
+    <div class="modal-content">
+      <span class="btn-close">&times;</span>
+      <h2 class="modal-main-title" id="remove-shared-loan-title"></h2>
+      <p class="modal-message" id="remove-shared-loan-message"></p>
+      <div class="modal-actions">
+        <button id="confirm-remove-shared-btn" class="btn-primary"></button>
+        <button id="cancel-remove-shared-btn" class="btn-primary" data-translate="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
   
   <!-- UNLOCK CONFIRMATION MODAL -->
   <div id="unlock-confirmation-modal" class="modal">
@@ -2537,6 +2567,13 @@
         if (error) return { error: error.message };
         return { ok: true };
       },
+      /** Recipient revokes the share (same effect as owner revoke: share is deleted, link stops working). */
+      async revokeShareAsRecipient(token) {
+        if (!supabaseClient) return { error: "Supabase not configured." };
+        const { error } = await supabaseClient.from("loan_shares").delete().eq("token", token);
+        if (error) return { error: error.message };
+        return { ok: true };
+      },
       async updateShare(shareId, updates) {
         if (!supabaseClient) return { error: "Supabase not configured." };
         const payload = {};
@@ -2835,6 +2872,12 @@
           sharedLinkExpired: 'Länken har gått ut eller är ogiltig.',
           sharedLinkUsedByOther: 'Denna länk har redan använts av någon annan.',
           someone: 'Någon',
+          removeFromMyList: 'Ta bort från min lista',
+          removeSharedLoanTitle: 'Ta bort delat lån från listan?',
+          removeSharedLoanMessage: 'Länken återkallas. Du ser inte längre detta lån i din lista (på någon enhet) och länken fungerar inte längre. Lånet finns kvar i {owner}s konto.',
+          sharedLoanRemovedFromList: 'Delningen är återkallad.',
+          badgeBorrowing: 'Jag lånar',
+          badgeLending: 'Jag lånar ut',
           duplicateLoan: 'Kopiera lån',
           copyOf: 'Kopia av {name}',
           loanDuplicated: 'Lån duplicerat',
@@ -3124,6 +3167,12 @@
           sharedLinkExpired: 'This link has expired or is invalid.',
           sharedLinkUsedByOther: 'This link has already been used by someone else.',
           someone: 'Someone',
+          removeFromMyList: 'Remove from my list',
+          removeSharedLoanTitle: 'Remove shared loan from your list?',
+          removeSharedLoanMessage: 'The share will be revoked. You will no longer see this loan in your list (on any device) and the link will stop working. The loan will remain in {owner}\'s account.',
+          sharedLoanRemovedFromList: 'Share revoked.',
+          badgeBorrowing: 'Borrowing',
+          badgeLending: 'Lending',
           duplicateLoan: 'Duplicate loan',
           copyOf: 'Copy of {name}',
           loanDuplicated: 'Loan duplicated',
@@ -3747,6 +3796,7 @@
             const modal = ev.target.closest(".modal");
             if (!modal) return;
             if (modal.id === "delete-confirmation-modal") ConfirmHandler.cancelDelete();
+            else if (modal.id === "remove-shared-loan-modal") UIHandler.cancelRemoveSharedLoan();
             else modal.style.display = "none";
           });
         });
@@ -3761,6 +3811,8 @@
             if (e.target !== modal) return;
             if (modal.id === "delete-confirmation-modal") {
               ConfirmHandler.cancelDelete();
+            } else if (modal.id === "remove-shared-loan-modal") {
+              UIHandler.cancelRemoveSharedLoan();
             } else {
               modal.style.display = "none";
               UIHandler.restoreBodyScroll();
@@ -3824,11 +3876,12 @@
       getMergedLoansList() {
         const myLoans = StorageService.load("loanData") || [];
         const shared = (this.sharesReceived || []).map(s => ({
-          ...(s.loan_snapshot || {}),
-          loanType: (s.recipient_view || "borrowing") === "lending" ? "lend" : "borrow",
-          _shared: { token: s.token, share: s }
-        }));
-        return myLoans.map((loan, i) => ({ ...loan, _myIndex: i })).concat(shared);
+            ...(s.loan_snapshot || {}),
+            loanType: (s.recipient_view || "borrowing") === "lending" ? "lend" : "borrow",
+            _shared: { token: s.token, share: s }
+          }));
+        const merged = myLoans.map((loan, i) => ({ ...loan, _myIndex: i })).concat(shared);
+        return merged.sort((a, b) => (a.loanType === "lend" ? 1 : 0) - (b.loanType === "lend" ? 1 : 0));
       },
       renderLoans() {
         if (this.currentShare) {
@@ -3918,8 +3971,16 @@
         const isLend = loan.loanType === "lend";
         const debtLabel = isLend ? LanguageService.translate("owedToYou") : LanguageService.translate("remainingDebt");
         const isShared = !!loan._shared;
+        const typeLabel = (loan.loanType === "lend" ? LanguageService.translate("badgeLending") : LanguageService.translate("badgeBorrowing"));
         const menuHtml = isShared
-          ? ""
+          ? `<div class="loan-detail-menu-wrap">
+                <button type="button" class="loan-detail-menu-btn" data-loan-index="${index}" data-action="menu" aria-haspopup="true" aria-expanded="false">
+                  <span class="material-icons">more_vert</span>
+                </button>
+                <div class="loan-detail-menu" role="menu">
+                  <button type="button" role="menuitem" data-action="remove-shared" data-loan-index="${index}">${LanguageService.translate("removeFromMyList")}</button>
+                </div>
+              </div>`
           : `<div class="loan-detail-menu-wrap">
                 <button type="button" class="loan-detail-menu-btn" data-loan-index="${index}" data-action="menu" aria-haspopup="true" aria-expanded="false">
                   <span class="material-icons">more_vert</span>
@@ -3933,6 +3994,7 @@
         return `
           <div class="loan-card-compact" data-loan-index="${index}" data-action="open" data-loan-type="${loan.loanType || "borrow"}">
             <div class="loan-card-compact-info">
+              <span class="loan-card-type-badge" data-type="${loan.loanType || "borrow"}">${escapeHtml(typeLabel)}</span>
               <h3>${escapeHtml(loan.name)}</h3>
               <div class="loan-card-compact-meta">
                 <span>${debtLabel}: ${UIHandler.formatCurrency(currentDebt, loan.currency)}</span>
@@ -3983,12 +4045,46 @@
             const action = btn.getAttribute("data-action");
             const cardIndex = parseInt(btn.getAttribute("data-loan-index"), 10);
             const item = merged[cardIndex];
+            if (action === "remove-shared" && item && item._shared) {
+              UIHandler.showRemoveSharedLoanModal(item._shared);
+              return;
+            }
             const myIndex = item && item._myIndex !== undefined ? item._myIndex : cardIndex;
             if (action === "edit") FormHandler.openLoanModal(myIndex);
             else if (action === "duplicate") FormHandler.duplicateLoan(myIndex).then(() => { UIHandler.showLoanList(); });
             else if (action === "delete") ConfirmHandler.confirmDelete("loan", myIndex);
           });
         });
+      },
+      _pendingRemoveShared: null,
+      showRemoveSharedLoanModal(sharedRef) {
+        const ownerName = (sharedRef.share && sharedRef.share.owner_display_name) || LanguageService.translate("someone");
+        this._pendingRemoveShared = sharedRef;
+        document.getElementById("remove-shared-loan-title").textContent = LanguageService.translate("removeSharedLoanTitle");
+        document.getElementById("remove-shared-loan-message").textContent = (LanguageService.translate("removeSharedLoanMessage") || "This shared loan will be removed from your list. The loan will remain in {owner}'s account.").replace("{owner}", ownerName);
+        document.getElementById("confirm-remove-shared-btn").textContent = LanguageService.translate("removeFromMyList");
+        document.body.style.overflow = "hidden";
+        document.getElementById("remove-shared-loan-modal").style.display = "flex";
+      },
+      async confirmRemoveSharedLoan() {
+        if (!this._pendingRemoveShared) return;
+        const token = this._pendingRemoveShared.token;
+        this._pendingRemoveShared = null;
+        document.getElementById("remove-shared-loan-modal").style.display = "none";
+        this.restoreBodyScroll();
+        const result = await ShareService.revokeShareAsRecipient(token);
+        if (result.error) {
+          this.showFeedback(result.error);
+          return;
+        }
+        this.sharesReceived = (this.sharesReceived || []).filter(s => s.token !== token);
+        this.renderLoans();
+        this.showFeedback(LanguageService.translate("sharedLoanRemovedFromList"));
+      },
+      cancelRemoveSharedLoan() {
+        this._pendingRemoveShared = null;
+        document.getElementById("remove-shared-loan-modal").style.display = "none";
+        this.restoreBodyScroll();
       },
       showLoanList() {
         this.currentDetailLoanIndex = null;
@@ -6365,6 +6461,12 @@
       });
       document.getElementById("cancel-delete-btn").addEventListener("click", () => {
         ConfirmHandler.cancelDelete();
+      });
+      document.getElementById("confirm-remove-shared-btn").addEventListener("click", () => {
+        UIHandler.confirmRemoveSharedLoan();
+      });
+      document.getElementById("cancel-remove-shared-btn").addEventListener("click", () => {
+        UIHandler.cancelRemoveSharedLoan();
       });
       
       document.getElementById("confirm-unlock-btn").addEventListener("click", () => {

@@ -106,6 +106,12 @@ create policy "Users can delete own loan_shares"
   on public.loan_shares for delete
   using (auth.uid() = owner_id);
 
+-- Recipient can revoke (delete) a share they received; same effect as owner revoking.
+drop policy if exists "Recipients can delete shares they received" on public.loan_shares;
+create policy "Recipients can delete shares they received"
+  on public.loan_shares for delete
+  using (auth.uid() = recipient_id);
+
 -- Return share by token if valid (not expired; unused or already redeemed by this user).
 create or replace function public.get_share_by_token(share_token text)
 returns json
