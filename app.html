@@ -155,8 +155,8 @@
       content: 'lock';
       font-family: 'Material Icons';
       position: absolute;
-      right: 10px;
-      top: 36%;
+      right: 12px;
+      top: 50%;
       transform: translateY(-50%);
       color: var(--button-delete);
       font-size: 18px;
@@ -166,13 +166,14 @@
       content: 'lock_open';
       font-family: 'Material Icons';
       position: absolute;
-      right: 10px;
-      top: 36%;
+      right: 12px;
+      top: 50%;
       transform: translateY(-50%);
       color: var(--primary-color);
       font-size: 18px;
       pointer-events: none;
     }
+    .form-row.locked-field-container { display: flex; align-items: center; }
     #loanStartDate-container {
       position: relative;
     }
@@ -3932,6 +3933,8 @@
         UIHandler.setLockState(modal, fields, shouldLock);
       },
       setLockState(modal, fields, shouldLock) {
+        const form = modal.querySelector("form");
+        const isViewOnly = form?.getAttribute("data-shared-view-only");
         const lockControl = modal.querySelector(".modal-lock-control");
         fields.forEach(fid => {
           const el = document.getElementById(fid);
@@ -3946,7 +3949,7 @@
             container.classList.add("unlocked-field-container");
           }
         });
-        if (lockControl) {
+        if (lockControl && !isViewOnly) {
           if (shouldLock) {
             lockControl.classList.add("locked");
             lockControl.classList.remove("unlocked");
@@ -5325,7 +5328,7 @@
         document.getElementById("loan-initial-interest-row").style.display = "none";
         document.getElementById("interest-section-help").style.display = "none";
         document.getElementById("loan-changes-section-help").style.display = "none";
-        UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], false);
+        UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
         this.attachChangeHandlers();
         UIHandler.showModal("loan-modal");
       },
