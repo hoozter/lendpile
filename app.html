@@ -825,21 +825,21 @@
       position: absolute;
       right: 0;
       top: 100%;
-      margin-top: 4px;
-      min-width: 160px;
+      margin-top: 6px;
+      min-width: 180px;
       background: var(--section-background);
-      border: 1px solid var(--input-border);
-      border-radius: 6px;
-      box-shadow: 0 4px 12px var(--card-shadow);
-      z-index: 10;
-      padding: 4px 0;
+      border: 1px solid var(--border-color, var(--input-border));
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      z-index: 20;
+      padding: 6px 0;
       display: none;
     }
     .loan-detail-menu.open { display: block; }
     .loan-detail-menu button {
       display: block;
       width: 100%;
-      padding: 10px 14px;
+      padding: 10px 16px;
       text-align: left;
       border: none;
       background: none;
@@ -848,6 +848,8 @@
       font-size: 0.9rem;
     }
     .loan-detail-menu button:hover { background: var(--input-background); }
+    .loan-detail-menu button:first-child { border-radius: 8px 8px 0 0; }
+    .loan-detail-menu button:last-child { border-radius: 0 0 8px 8px; }
     .loan-detail-menu-wrap { position: relative; }
     .loan-detail-header {
       display: flex;
@@ -984,21 +986,21 @@
       position: absolute;
       right: 0;
       top: 100%;
-      margin-top: 4px;
-      min-width: 160px;
+      margin-top: 6px;
+      min-width: 180px;
       background: var(--section-background);
-      border: 1px solid var(--input-border);
-      border-radius: 6px;
-      box-shadow: 0 4px 12px var(--card-shadow);
-      z-index: 10;
-      padding: 4px 0;
+      border: 1px solid var(--border-color, var(--input-border));
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      z-index: 20;
+      padding: 6px 0;
       display: none;
     }
     .overview-detail-menu.dropdown-menu.open { display: block; }
     .overview-detail-menu.dropdown-menu button {
       display: block;
       width: 100%;
-      padding: 10px 14px;
+      padding: 10px 16px;
       text-align: left;
       border: none;
       background: none;
@@ -1010,6 +1012,8 @@
       height: auto;
     }
     .overview-detail-menu.dropdown-menu button:hover { background: var(--input-background); }
+    .overview-detail-menu.dropdown-menu button:first-child { border-radius: 8px 8px 0 0; }
+    .overview-detail-menu.dropdown-menu button:last-child { border-radius: 0 0 8px 8px; }
     .payment-plans-header {
       display: flex;
       justify-content: flex-end;
@@ -1647,15 +1651,13 @@
     .share-active-item-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .share-active-item select { padding: 4px 8px; font-size: 12px; }
     #share-loan-modal select { max-width: 200px; }
-    .shared-loan-banner {
-      background: var(--primary-color);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 4px;
-      margin-bottom: 12px;
-      font-size: 14px;
+    .shared-by-line {
+      font-size: 0.875rem;
+      color: var(--text-color);
+      opacity: 0.85;
+      margin: -4px 0 12px 0;
+      padding: 0;
     }
-    .shared-loan-banner .shared-loan-save-btn { margin-left: 10px; vertical-align: middle; }
     .transfer-offer-banner {
       background: var(--secondary-color);
       color: #fff;
@@ -1667,6 +1669,20 @@
     .transfer-offer-banner .transfer-offer-item { margin-bottom: 10px; }
     .transfer-offer-banner .transfer-offer-item:last-child { margin-bottom: 0; }
     .transfer-offer-banner .transfer-offer-actions { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .edit-request-banner, .edit-resolution-banner {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      background: var(--section-background);
+      border: 1px solid var(--border-color, var(--input-border));
+    }
+    .edit-request-banner .edit-request-item { margin-bottom: 10px; }
+    .edit-request-banner .edit-request-item:last-child { margin-bottom: 0; }
+    .edit-request-banner .edit-request-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .edit-resolution-banner .edit-resolution-item { margin-bottom: 8px; }
+    .edit-resolution-banner .edit-resolution-item:last-child { margin-bottom: 0; }
+    .edit-resolution-banner .edit-resolution-actions { margin-top: 8px; }
     .password-requirements {
       font-size: 12px;
       color: var(--text-color-muted, #666);
@@ -1750,6 +1766,8 @@
   <!-- MAIN CONTAINER -->
   <div class="container">
     <div id="transfer-offer-banner" class="transfer-offer-banner hidden" role="alert"></div>
+    <div id="edit-request-banner" class="edit-request-banner hidden" role="alert"></div>
+    <div id="edit-resolution-banner" class="edit-resolution-banner hidden" role="alert"></div>
     <div id="view-list" class="main-view">
       <section id="loan-info">
         <div id="list-summary" class="list-summary" aria-live="polite"></div>
@@ -1763,7 +1781,7 @@
       </section>
     </div>
     <div id="view-detail" class="main-view hidden">
-      <div id="shared-loan-banner" class="shared-loan-banner hidden"></div>
+      <p id="shared-by-line" class="shared-by-line hidden" aria-live="polite"></p>
       <div class="loan-detail-header">
         <button type="button" class="btn-back" id="back-to-loans" aria-label="Back to loans">
           <span class="material-icons">arrow_back</span>
@@ -2542,7 +2560,7 @@
         const user = await AuthService.getUser();
         if (!user) return { error: "Not signed in.", shares: [] };
         const { data, error } = await supabaseClient.from("loan_shares")
-          .select("id, token, loan_id, permission, recipient_view, expires_at, used_at, transfer_requested_at, created_at")
+          .select("id, token, loan_id, loan_snapshot, permission, recipient_view, expires_at, used_at, transfer_requested_at, created_at, edit_requested_at, edit_requested_by")
           .eq("owner_id", user.id)
           .order("created_at", { ascending: false });
         if (error) return { error: error.message, shares: [] };
@@ -2554,7 +2572,7 @@
         const user = await AuthService.getUser();
         if (!user) return { error: "Not signed in.", shares: [] };
         const { data, error } = await supabaseClient.from("loan_shares")
-          .select("id, token, loan_id, loan_snapshot, permission, recipient_view, owner_display_name, expires_at, used_at, recipient_id")
+          .select("id, token, loan_id, loan_snapshot, permission, recipient_view, owner_display_name, expires_at, used_at, recipient_id, edit_requested_at, edit_request_resolved_at, edit_request_outcome, recipient_seen_resolution_at")
           .eq("recipient_id", user.id)
           .gt("expires_at", new Date().toISOString())
           .order("used_at", { ascending: false });
@@ -2583,6 +2601,30 @@
         const { error } = await supabaseClient.from("loan_shares").update(payload).eq("id", shareId);
         if (error) return { error: error.message };
         return { ok: true };
+      },
+      async requestEditAccess(shareId) {
+        if (!supabaseClient) return { error: "Supabase not configured." };
+        const { data, error } = await supabaseClient.rpc("request_edit_access", { share_id: shareId });
+        if (error) return { error: error.message };
+        return { ok: data === true };
+      },
+      async approveEditRequest(shareId) {
+        if (!supabaseClient) return { error: "Supabase not configured." };
+        const { data, error } = await supabaseClient.rpc("approve_edit_request", { share_id: shareId });
+        if (error) return { error: error.message };
+        return { ok: data === true };
+      },
+      async declineEditRequest(shareId) {
+        if (!supabaseClient) return { error: "Supabase not configured." };
+        const { data, error } = await supabaseClient.rpc("decline_edit_request", { share_id: shareId });
+        if (error) return { error: error.message };
+        return { ok: data === true };
+      },
+      async markEditResolutionSeen(shareId) {
+        if (!supabaseClient) return { error: "Supabase not configured." };
+        const { data, error } = await supabaseClient.rpc("mark_edit_resolution_seen", { share_id: shareId });
+        if (error) return { error: error.message };
+        return { ok: data === true };
       },
       async listTransferOffers() {
         if (!supabaseClient) return { error: "Supabase not configured.", offers: [] };
@@ -2848,6 +2890,18 @@
           shareLinkCreated: 'Länk skapad. Dela den endast med den du vill ska se lånet.',
           activeSharesForThisLoan: 'Aktiva länkar för detta lån',
           revokeShare: 'Återkalla',
+          editRequestBanner: 'Redigeringsåtkomst begärd för {name}.',
+          editRequestApprovedBanner: 'Din begäran om redigeringsåtkomst för {name} godkändes.',
+          editRequestDeclinedBanner: 'Din begäran om redigeringsåtkomst för {name} avslogs.',
+          editRequestedByRecipient: 'Mottagaren har bett om redigeringsåtkomst.',
+          editRequestApproved: 'Redigeringsåtkomst beviljad.',
+          editRequestDeclined: 'Begäran avslagen.',
+          approve: 'Godkänn',
+          decline: 'Avböj',
+          ok: 'OK',
+          viewOnlyRequestEdit: 'Endast visa. Begär redigeringsåtkomst från {name}?',
+          requestEditAccess: 'Begär redigeringsåtkomst',
+          requestAlreadySent: 'Begäran skickad. {name} kan bevilja åtkomst från delningsinställningarna.',
           transferToRecipient: 'Överför till mottagare',
           transferToRecipientConfirm: 'Skicka en överföringsförfrågan till mottagaren? De får ett erbjudande när de öppnar appen och kan acceptera eller avböja.',
           transferRequested: 'Överföring begärd. Mottagaren ser erbjudandet när de öppnar appen.',
@@ -2867,6 +2921,7 @@
           copyLink: 'Kopiera länk',
           signInToViewShare: 'Logga in för att öppna det delade lånet.',
           sharedLoanWithYouIntro: 'delade ett lån med dig:',
+          sharedBy: 'Delad av {name}',
           sharedLoanBanner: '{name} delar detta lån med dig.',
           sharedLoanSaveChanges: 'Spara ändringar',
           sharedLinkExpired: 'Länken har gått ut eller är ogiltig.',
@@ -3143,6 +3198,18 @@
           shareLinkCreated: 'Link created. Share it only with the person who should see the loan.',
           activeSharesForThisLoan: 'Active links for this loan',
           revokeShare: 'Revoke',
+          editRequestBanner: 'Edit access requested for {name}.',
+          editRequestApprovedBanner: 'Your edit access request for {name} was approved.',
+          editRequestDeclinedBanner: 'Your edit access request for {name} was declined.',
+          editRequestedByRecipient: 'Recipient requested edit access.',
+          editRequestApproved: 'Edit access granted.',
+          editRequestDeclined: 'Request declined.',
+          approve: 'Approve',
+          decline: 'Decline',
+          ok: 'OK',
+          viewOnlyRequestEdit: 'View-only. Request edit access from {name}?',
+          requestEditAccess: 'Request edit access',
+          requestAlreadySent: 'Request sent. {name} can grant access from share settings.',
           transferToRecipient: 'Transfer to recipient',
           transferToRecipientConfirm: 'Send a transfer request to the recipient? They will see an offer when they open the app and can accept or decline.',
           transferRequested: 'Transfer requested. The recipient will see the offer when they open the app.',
@@ -3162,6 +3229,7 @@
           copyLink: 'Copy link',
           signInToViewShare: 'Sign in to open this shared loan.',
           sharedLoanWithYouIntro: 'shared a loan with you:',
+          sharedBy: 'Shared by {name}',
           sharedLoanBanner: '{name} shared this loan with you.',
           sharedLoanSaveChanges: 'Save changes',
           sharedLinkExpired: 'This link has expired or is invalid.',
@@ -3689,6 +3757,8 @@
         this.initializeEventListeners();
         this.renderLoans();
         this.checkTransferOffers();
+        this.checkEditRequests();
+        this.checkEditResolutionBanner();
       },
       initializeTheme() {
         const saved = localStorage.getItem("theme");
@@ -3978,6 +4048,8 @@
                   <span class="material-icons">more_vert</span>
                 </button>
                 <div class="loan-detail-menu" role="menu">
+                  <button type="button" role="menuitem" data-action="edit" data-loan-index="${index}">${LanguageService.translate("edit")}</button>
+                  <button type="button" role="menuitem" data-action="duplicate" data-loan-index="${index}">${LanguageService.translate("duplicate")}</button>
                   <button type="button" role="menuitem" data-action="remove-shared" data-loan-index="${index}">${LanguageService.translate("removeFromMyList")}</button>
                 </div>
               </div>`
@@ -4045,9 +4117,22 @@
             const action = btn.getAttribute("data-action");
             const cardIndex = parseInt(btn.getAttribute("data-loan-index"), 10);
             const item = merged[cardIndex];
-            if (action === "remove-shared" && item && item._shared) {
-              UIHandler.showRemoveSharedLoanModal(item._shared);
-              return;
+            if (item && item._shared) {
+              if (action === "edit") {
+                UIHandler.currentShare = item._shared;
+                UIHandler.currentDetailLoanIndex = null;
+                UIHandler.showSharedLoan();
+                return;
+              }
+              if (action === "duplicate") {
+                UIHandler.currentShare = item._shared;
+                UIHandler.duplicateSharedLoanToMyList();
+                return;
+              }
+              if (action === "remove-shared") {
+                UIHandler.showRemoveSharedLoanModal(item._shared);
+                return;
+              }
             }
             const myIndex = item && item._myIndex !== undefined ? item._myIndex : cardIndex;
             if (action === "edit") FormHandler.openLoanModal(myIndex);
@@ -4086,13 +4171,26 @@
         document.getElementById("remove-shared-loan-modal").style.display = "none";
         this.restoreBodyScroll();
       },
+      async duplicateSharedLoanToMyList() {
+        const loan = this.getSharedLoanForDisplay();
+        if (!loan) return;
+        const copy = { ...loan, id: crypto.randomUUID() };
+        const current = StorageService.load("loanData") || [];
+        const updated = [...current, copy];
+        StorageService.save("loanData", updated);
+        if (!localStorage.getItem("offlineMode") && typeof SyncService !== "undefined") await SyncService.syncData();
+        this.currentShare = null;
+        this.showLoanList();
+        this.showLoanDetail(updated.length - 1);
+        this.showFeedback(LanguageService.translate("loanDuplicated"));
+      },
       showLoanList() {
         this.currentDetailLoanIndex = null;
         this.currentShare = null;
         document.getElementById("view-list").style.display = "block";
         document.getElementById("view-detail").style.display = "none";
-        const banner = document.getElementById("shared-loan-banner");
-        if (banner) banner.style.display = "none";
+        const sharedByEl = document.getElementById("shared-by-line");
+        if (sharedByEl) sharedByEl.classList.add("hidden");
         const menuWrap = document.getElementById("loan-detail-header-menu-wrap");
         if (menuWrap) menuWrap.style.display = "";
         this.renderLoans();
@@ -4107,10 +4205,23 @@
         const loan = loans[index];
         if (!loan) { this.showLoanList(); return; }
         document.getElementById("loan-detail-name").textContent = loan.name;
+        const sharedByEl = document.getElementById("shared-by-line");
+        if (sharedByEl) sharedByEl.classList.add("hidden");
         const headerMenuWrap = document.getElementById("loan-detail-header-menu-wrap");
-        if (headerMenuWrap) { headerMenuWrap.setAttribute("data-loan-index", String(index)); headerMenuWrap.style.display = ""; }
-        const banner = document.getElementById("shared-loan-banner");
-        if (banner) banner.style.display = "none";
+        if (headerMenuWrap) {
+          headerMenuWrap.setAttribute("data-loan-index", String(index));
+          headerMenuWrap.removeAttribute("data-shared");
+          headerMenuWrap.style.display = "";
+          const menu = headerMenuWrap.querySelector(".overview-detail-menu");
+          if (menu) {
+            menu.innerHTML = `
+              <button type="button" role="menuitem" data-action="edit">${LanguageService.translate("edit")}</button>
+              <button type="button" role="menuitem" data-action="share">${LanguageService.translate("shareLoan")}</button>
+              <button type="button" role="menuitem" data-action="duplicate">${LanguageService.translate("duplicate")}</button>
+              <button type="button" role="menuitem" data-action="delete">${LanguageService.translate("delete")}</button>
+            `;
+          }
+        }
         this.renderDetailContent();
         document.querySelectorAll(".loan-detail-tab").forEach(t => t.classList.remove("active"));
         document.querySelector(".loan-detail-tab[data-tab=overview]").classList.add("active");
@@ -4140,23 +4251,25 @@
         if (!loan) { this.currentShare = null; this.showLoanList(); return; }
         document.getElementById("loan-detail-name").textContent = loan.name;
         const headerMenuWrap = document.getElementById("loan-detail-header-menu-wrap");
-        if (headerMenuWrap) headerMenuWrap.style.display = "none";
-        const banner = document.getElementById("shared-loan-banner");
-        if (banner) {
-          const name = (this.currentShare.share.owner_display_name || "").trim() || LanguageService.translate("someone");
-          banner.innerHTML = "";
-          const text = document.createTextNode((LanguageService.translate("sharedLoanBanner") || "{name} shared this loan with you.").replace("{name}", name));
-          banner.appendChild(text);
-          if (this.currentShare.share.permission === "edit") {
-            const saveBtn = document.createElement("button");
-            saveBtn.type = "button";
-            saveBtn.className = "btn-primary shared-loan-save-btn";
-            saveBtn.textContent = LanguageService.translate("sharedLoanSaveChanges");
-            saveBtn.addEventListener("click", () => FormHandler.openLoanModalForSharedLoan());
-            banner.appendChild(document.createTextNode(" "));
-            banner.appendChild(saveBtn);
+        const sharedByEl = document.getElementById("shared-by-line");
+        const ownerName = (this.currentShare.share.owner_display_name || "").trim() || LanguageService.translate("someone");
+        const sharedByText = (LanguageService.translate("sharedBy") || "Shared by {name}").replace("{name}", ownerName);
+        if (sharedByEl) {
+          sharedByEl.textContent = sharedByText;
+          sharedByEl.classList.remove("hidden");
+        }
+        if (headerMenuWrap) {
+          headerMenuWrap.style.display = "";
+          headerMenuWrap.removeAttribute("data-loan-index");
+          headerMenuWrap.setAttribute("data-shared", "true");
+          const menu = headerMenuWrap.querySelector(".overview-detail-menu");
+          if (menu) {
+            menu.innerHTML = `
+              <button type="button" role="menuitem" data-action="edit">${LanguageService.translate("edit")}</button>
+              <button type="button" role="menuitem" data-action="duplicate">${LanguageService.translate("duplicate")}</button>
+              <button type="button" role="menuitem" data-action="remove-shared">${LanguageService.translate("removeFromMyList")}</button>
+            `;
           }
-          banner.style.display = "block";
         }
         this.renderDetailContent();
         document.querySelectorAll(".loan-detail-tab").forEach(t => t.classList.remove("active"));
@@ -4772,6 +4885,91 @@
           });
         });
       },
+      async checkEditRequests() {
+        const banner = document.getElementById("edit-request-banner");
+        if (!banner) return;
+        if (localStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+        const result = await ShareService.listMyShares();
+        const shares = (result.shares || []).filter(s => s.edit_requested_at);
+        if (shares.length === 0) {
+          banner.style.display = "none";
+          banner.innerHTML = "";
+          return;
+        }
+        const loanName = (s) => (s.loan_snapshot && s.loan_snapshot.name) ? escapeHtml(s.loan_snapshot.name) : LanguageService.translate("loan");
+        banner.innerHTML = shares.map(s => `
+          <div class="edit-request-item" data-share-id="${s.id}">
+            ${(LanguageService.translate("editRequestBanner") || "Edit access requested for {name}.").replace("{name}", loanName(s))}
+            <div class="edit-request-actions">
+              <button type="button" class="btn-primary edit-request-approve-btn" data-share-id="${s.id}">${LanguageService.translate("approve")}</button>
+              <button type="button" class="btn-edit edit-request-decline-btn" data-share-id="${s.id}">${LanguageService.translate("decline")}</button>
+            </div>
+          </div>
+        `).join("");
+        banner.style.display = "block";
+        banner.querySelectorAll(".edit-request-approve-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-share-id");
+            if (!id) return;
+            const r = await ShareService.approveEditRequest(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else {
+              UIHandler.showFeedback(LanguageService.translate("editRequestApproved"));
+              UIHandler.checkEditRequests();
+              UIHandler.populateShareActiveList();
+            }
+          });
+        });
+        banner.querySelectorAll(".edit-request-decline-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-share-id");
+            if (!id) return;
+            const r = await ShareService.declineEditRequest(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else {
+              UIHandler.showFeedback(LanguageService.translate("editRequestDeclined"));
+              UIHandler.checkEditRequests();
+              UIHandler.populateShareActiveList();
+            }
+          });
+        });
+      },
+      async checkEditResolutionBanner() {
+        const banner = document.getElementById("edit-resolution-banner");
+        if (!banner) return;
+        if (localStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+        const result = await ShareService.listSharesReceived();
+        const unseen = (result.shares || []).filter(s => s.edit_request_resolved_at && !s.recipient_seen_resolution_at);
+        if (unseen.length === 0) {
+          banner.style.display = "none";
+          banner.innerHTML = "";
+          return;
+        }
+        const loanName = (s) => (s.loan_snapshot && s.loan_snapshot.name) ? escapeHtml(s.loan_snapshot.name) : LanguageService.translate("loan");
+        banner.innerHTML = unseen.map(s => {
+          const name = loanName(s);
+          const msg = s.edit_request_outcome === "approved"
+            ? (LanguageService.translate("editRequestApprovedBanner") || "Your edit access request for {name} was approved.").replace("{name}", name)
+            : (LanguageService.translate("editRequestDeclinedBanner") || "Your edit access request for {name} was declined.").replace("{name}", name);
+          return `
+            <div class="edit-resolution-item" data-share-id="${s.id}">
+              ${msg}
+              <div class="edit-resolution-actions">
+                <button type="button" class="btn-primary edit-resolution-ok-btn" data-share-id="${s.id}">${LanguageService.translate("ok")}</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+        banner.style.display = "block";
+        banner.querySelectorAll(".edit-resolution-ok-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-share-id");
+            if (!id) return;
+            await ShareService.markEditResolutionSeen(id);
+            UIHandler.checkEditResolutionBanner();
+          });
+        });
+      },
       async populateShareActiveList() {
         const loanIndex = this.shareLoanIndex;
         const section = document.getElementById("share-active-list-section");
@@ -4806,12 +5004,15 @@
           const transferPending = s.transfer_requested_at ? " · " + LanguageService.translate("transferPending") : "";
           const showTransferBtn = s.used_at && !s.transfer_requested_at;
           const showCancelTransferBtn = s.used_at && s.transfer_requested_at;
+          const editRequested = !!s.edit_requested_at;
           return `
             <div class="share-active-item" data-share-id="${s.id}">
               <div class="share-active-item-meta">
                 ${escapeHtml(permLabel)} · ${escapeHtml(viewLabel)} · ${LanguageService.translate("shareExpiresOn")}: ${expiresStr}${usedLabel}${transferPending}${expiredLabel}
+                ${editRequested ? "<br><strong>" + (LanguageService.translate("editRequestedByRecipient") || "Recipient requested edit access.") + "</strong>" : ""}
               </div>
               <div class="share-active-item-actions">
+                ${editRequested ? `<button type="button" class="btn-primary share-edit-approve-btn" data-share-id="${s.id}">${LanguageService.translate("approve")}</button><button type="button" class="btn-edit share-edit-decline-btn" data-share-id="${s.id}">${LanguageService.translate("decline")}</button>` : ""}
                 <select class="share-permission-select" data-share-id="${s.id}" aria-label="${escapeHtml(LanguageService.translate("changePermission"))}">
                   <option value="view" ${s.permission === "view" ? "selected" : ""}>${LanguageService.translate("shareViewOnly")}</option>
                   <option value="edit" ${s.permission === "edit" ? "selected" : ""}>${LanguageService.translate("shareCanEdit")}</option>
@@ -4823,6 +5024,32 @@
             </div>
           `;
         }).join("");
+        listEl.querySelectorAll(".share-edit-approve-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-share-id");
+            if (!id) return;
+            const r = await ShareService.approveEditRequest(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else {
+              UIHandler.showFeedback(LanguageService.translate("editRequestApproved"));
+              UIHandler.populateShareActiveList();
+              UIHandler.checkEditRequests();
+            }
+          });
+        });
+        listEl.querySelectorAll(".share-edit-decline-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-share-id");
+            if (!id) return;
+            const r = await ShareService.declineEditRequest(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else {
+              UIHandler.showFeedback(LanguageService.translate("editRequestDeclined"));
+              UIHandler.populateShareActiveList();
+              UIHandler.checkEditRequests();
+            }
+          });
+        });
         listEl.querySelectorAll(".share-revoke-btn").forEach(btn => {
           btn.addEventListener("click", async () => {
             const id = btn.getAttribute("data-share-id");
@@ -4876,6 +5103,13 @@
         const form = document.getElementById("loan-form-modal");
         const title = document.getElementById("loan-modal-title");
         const removeBtn = document.getElementById("remove-loan-btn");
+        form.removeAttribute("data-shared-view-only");
+        const lockWrap = document.getElementById("globalLockControl");
+        if (lockWrap) lockWrap.innerHTML = `<span class="material-icons">lock</span><span class="lock-text">${LanguageService.translate("unlockSensitiveFields")}</span>`;
+        document.getElementById("add-interest-change-btn").style.display = "";
+        document.getElementById("add-loan-change-btn").style.display = "";
+        const subBtn = form.querySelector('button[type="submit"]');
+        if (subBtn) subBtn.style.display = "";
         form.reset();
         form.removeAttribute("data-loan-index");
         form.removeAttribute("data-edit-mode");
@@ -4989,6 +5223,13 @@
         const form = document.getElementById("loan-form-modal");
         const title = document.getElementById("loan-modal-title");
         const removeBtn = document.getElementById("remove-loan-btn");
+        form.removeAttribute("data-shared-view-only");
+        const lockWrap = document.getElementById("globalLockControl");
+        if (lockWrap) lockWrap.innerHTML = `<span class="material-icons">lock</span><span class="lock-text">${LanguageService.translate("unlockSensitiveFields")}</span>`;
+        document.getElementById("add-interest-change-btn").style.display = "";
+        document.getElementById("add-loan-change-btn").style.display = "";
+        const subBtn = form.querySelector('button[type="submit"]');
+        if (subBtn) subBtn.style.display = "";
         form.reset();
         form.removeAttribute("data-loan-index");
         form.removeAttribute("data-edit-mode");
@@ -5064,6 +5305,99 @@
         document.getElementById("loan-changes-section-help").style.display = "none";
         UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], false);
         this.attachChangeHandlers();
+        UIHandler.showModal("loan-modal");
+      },
+      openLoanModalForSharedViewOnly() {
+        if (!UIHandler.currentShare || !UIHandler.currentShare.share) return;
+        const share = UIHandler.currentShare.share;
+        const loan = share.loan_snapshot;
+        if (!loan) return;
+        const shareId = share.id;
+        const modal = document.getElementById("loan-modal");
+        const form = document.getElementById("loan-form-modal");
+        const title = document.getElementById("loan-modal-title");
+        const removeBtn = document.getElementById("remove-loan-btn");
+        form.reset();
+        form.removeAttribute("data-loan-index");
+        form.removeAttribute("data-edit-mode");
+        form.removeAttribute("data-shared-edit");
+        form.setAttribute("data-shared-view-only", shareId);
+        document.getElementById("interest-changes-list").innerHTML = "";
+        document.getElementById("loan-changes-list").innerHTML = "";
+        const ownerName = (share.owner_display_name || "").trim() || LanguageService.translate("someone");
+        const borrowBtn = form.querySelector("#loan-type-borrow");
+        const lendBtn = form.querySelector("#loan-type-lend");
+        const loanTypeInput = form.querySelector("#loanType");
+        const loanType = loan.loanType === "lend" ? "lend" : "borrow";
+        if (borrowBtn) { borrowBtn.classList.toggle("active", loanType === "borrow"); lendBtn.classList.toggle("active", loanType === "lend"); borrowBtn.disabled = true; lendBtn.disabled = true; }
+        if (loanTypeInput) loanTypeInput.value = loanType;
+        title.textContent = LanguageService.translate("editLoan");
+        form.querySelector("#loanName").value = loan.name || "";
+        form.querySelector("#loanStartDate").value = loan.startDate || "";
+        form.querySelector("#loanInitialAmount").value = loan.initialAmount ?? "";
+        form.querySelector("#loanCurrency").value = loan.currency || "SEK";
+        ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency"].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = true;
+        });
+        const sharedInterestToShow = (() => {
+          const sorted = (loan.interestChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+          const hasAtStart = sorted.length && sorted[0].date <= loan.startDate;
+          if (loan.interestRate != null && loan.interestRate !== "" && !hasAtStart) {
+            return [{ date: loan.startDate, rate: loan.interestRate }].concat(sorted);
+          }
+          return sorted;
+        })();
+        sharedInterestToShow.forEach((ch) => {
+          const div = document.createElement("div");
+          div.className = "change-item";
+          div.innerHTML = `
+            <div class="change-item-details">
+              <span>${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
+              <span>${LanguageService.translate("rate")}: ${escapeHtml(String(ch.rate))}%</span>
+            </div>
+          `;
+          document.getElementById("interest-changes-list").appendChild(div);
+        });
+        (loan.loanChanges || []).forEach((ch) => {
+          const div = document.createElement("div");
+          div.className = "change-item";
+          div.innerHTML = `
+            <div class="change-item-details">
+              <span>${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
+              <span>${LanguageService.translate("amount")}: ${escapeHtml(String(ch.amount))}</span>
+            </div>
+          `;
+          document.getElementById("loan-changes-list").appendChild(div);
+        });
+        document.getElementById("add-interest-change-btn").style.display = "none";
+        document.getElementById("add-loan-change-btn").style.display = "none";
+        document.getElementById("loan-initial-interest-row").style.display = "none";
+        document.getElementById("interest-section-help").style.display = "none";
+        document.getElementById("loan-changes-section-help").style.display = "none";
+        removeBtn.style.display = "none";
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.style.display = "none";
+        const lockWrap = document.getElementById("globalLockControl");
+        const alreadyRequested = !!share.edit_requested_at;
+        const requestMsg = (LanguageService.translate("viewOnlyRequestEdit") || "View-only. Request edit access from {name}?").replace("{name}", ownerName);
+        lockWrap.innerHTML = `
+          <span class="material-icons">lock</span>
+          <span class="lock-text">${escapeHtml(requestMsg)}</span>
+          <button type="button" class="btn-primary view-only-request-btn" id="view-only-request-btn" ${alreadyRequested ? "disabled" : ""}>${alreadyRequested ? (LanguageService.translate("requestAlreadySent") || "Request sent").replace("{name}", ownerName) : LanguageService.translate("requestEditAccess")}</button>
+        `;
+        if (!alreadyRequested) {
+          lockWrap.querySelector("#view-only-request-btn").addEventListener("click", async () => {
+            const r = await ShareService.requestEditAccess(shareId);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else {
+              UIHandler.showFeedback((LanguageService.translate("requestAlreadySent") || "Request sent. {name} can grant access from share settings.").replace("{name}", ownerName));
+              const btn = lockWrap.querySelector("#view-only-request-btn");
+              if (btn) { btn.disabled = true; btn.textContent = (LanguageService.translate("requestAlreadySent") || "Request sent").replace("{name}", ownerName); }
+            }
+          });
+        }
+        UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
         UIHandler.showModal("loan-modal");
       },
       async duplicateLoan(index) {
@@ -6395,7 +6729,17 @@
           if (menu) menu.classList.remove("open");
           const index = wrap ? parseInt(wrap.getAttribute("data-loan-index"), 10) : null;
           const action = overviewItem.getAttribute("data-action");
-          if (index != null && action === "edit") FormHandler.openLoanModal(index);
+          const isShared = wrap && wrap.getAttribute("data-shared") === "true";
+          if (isShared) {
+            if (action === "edit") {
+              if (UIHandler.currentShare && UIHandler.currentShare.share && UIHandler.currentShare.share.permission === "view") {
+                FormHandler.openLoanModalForSharedViewOnly();
+              } else {
+                FormHandler.openLoanModalForSharedLoan();
+              }
+            } else if (action === "duplicate") UIHandler.duplicateSharedLoanToMyList();
+            else if (action === "remove-shared") UIHandler.showRemoveSharedLoanModal(UIHandler.currentShare);
+          } else if (index != null && action === "edit") FormHandler.openLoanModal(index);
           else if (index != null && action === "share") UIHandler.openShareModal(index);
           else if (index != null && action === "duplicate") FormHandler.duplicateLoan(index).then(() => UIHandler.showLoanList());
           else if (index != null && action === "delete") ConfirmHandler.confirmDelete("loan", index);
@@ -6647,6 +6991,8 @@
       await updateUserHeader();
       await tryRedeemPendingShare();
       UIHandler.checkTransferOffers();
+      UIHandler.checkEditRequests();
+      UIHandler.checkEditResolutionBanner();
     }
 
     document.getElementById("login-form").addEventListener("submit", async (e) => {

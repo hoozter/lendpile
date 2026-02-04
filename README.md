@@ -9,8 +9,8 @@ A clear, reliable loan and amortization tracker. Plan loans you borrow or lend, 
 - Set up amortization plans (one-off or recurring) and see exactly what you’ll pay and when.
 - Track both sides: borrowing (what you owe) and lending (what’s owed to you).
 - Export and import your data; use with or without an account.
-- Sign in to sync across browsers or devices; 2FA and recovery email supported.
-- Share a loan via link; the recipient sees who shared it and which loan before signing in. Shared loans stay in your list (one source of truth); the recipient can revoke the share from their side. The loan list shows type badges (Borrowing / Lending) and is grouped by type.
+- Sign in to sync across browsers or devices; 2FA and recovery email supported. After you confirm your email via the link we send, you’ll see a short welcome message in the app.
+- Share a loan via link (view-only or can edit). The recipient sees who shared it and which loan before signing in. Shared loans stay in your list (one source of truth); the recipient can revoke the share from their side. With view-only access, they can still open the loan and all modals in read-only form and request edit access; you see requests in a banner and in the Share dialog and can approve or decline (both of you see the outcome on next load). The loan list shows type badges (Borrowing / Lending) and is grouped by type.
 
 Lendpile is built with care. The calculations are there to help you plan and understand—not to replace your lender or adviser. For important decisions, confirm the numbers with your bank or a qualified professional. See [privacy.html](privacy.html) for the full disclaimer and privacy details.
 
@@ -58,7 +58,7 @@ Sign in to sync your data when you use the app on another browser or device. Cho
 | `assets/` | Favicon, logo (`lendpile.svg`), and screenshot. |
 | `scripts/write-config.js` | Build script: reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from env and writes `config.js` (for Cloudflare Pages or other CI). |
 | `config.example.js` | Config template; copy to `config.js` and add your Supabase URL and anon key (for local dev). |
-| `docs/supabase-schema.sql` | Supabase table and RLS; run once in SQL Editor. |
+| `docs/supabase-schema.sql` | Supabase tables, RLS, and functions (sharing, edit-access requests, etc.); run once in SQL Editor. |
 | `docs/check-schema.sql` | Optional: check live DB schema. |
 | `PROJECT_OUTLINE.md` | Overview and roadmap. |
 

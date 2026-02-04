@@ -80,6 +80,14 @@ alter table public.loan_shares enable row level security;
 -- Backfill for existing DBs that already had loan_shares without this column:
 do $$ begin alter table public.loan_shares add column if not exists transfer_requested_at timestamptz; exception when others then null; end $$;
 
+-- Edit access request (recipient requests; owner approves/declines; recipient sees resolution banner on next load).
+-- Optional later: email notifications (to requester when approved/declined, to owner when request received) via Edge Functions.
+do $$ begin alter table public.loan_shares add column if not exists edit_requested_at timestamptz; exception when others then null; end $$;
+do $$ begin alter table public.loan_shares add column if not exists edit_requested_by uuid references auth.users(id) on delete set null; exception when others then null; end $$;
+do $$ begin alter table public.loan_shares add column if not exists edit_request_resolved_at timestamptz; exception when others then null; end $$;
+do $$ begin alter table public.loan_shares add column if not exists edit_request_outcome text check (edit_request_outcome in ('approved', 'declined')); exception when others then null; end $$;
+do $$ begin alter table public.loan_shares add column if not exists recipient_seen_resolution_at timestamptz; exception when others then null; end $$;
+
 drop policy if exists "Recipients can select shares offered to them" on public.loan_shares;
 create policy "Recipients can select shares offered to them"
   on public.loan_shares for select
@@ -122,7 +130,8 @@ as $$
 declare
   row record;
 begin
-  select id, owner_id, loan_id, loan_snapshot, permission, recipient_view, owner_display_name, expires_at, used_at, recipient_id
+  select id, owner_id, loan_id, loan_snapshot, permission, recipient_view, owner_display_name, expires_at, used_at, recipient_id,
+    edit_requested_at, edit_requested_by, edit_request_resolved_at, edit_request_outcome, recipient_seen_resolution_at
   into row
   from public.loan_shares
   where token = share_token;
@@ -145,7 +154,12 @@ begin
     'owner_display_name', row.owner_display_name,
     'expires_at', row.expires_at,
     'used_at', row.used_at,
-    'recipient_id', row.recipient_id
+    'recipient_id', row.recipient_id,
+    'edit_requested_at', row.edit_requested_at,
+    'edit_requested_by', row.edit_requested_by,
+    'edit_request_resolved_at', row.edit_request_resolved_at,
+    'edit_request_outcome', row.edit_request_outcome,
+    'recipient_seen_resolution_at', row.recipient_seen_resolution_at
   );
 end;
 $$;
@@ -311,6 +325,71 @@ begin
   update public.loan_shares
   set transfer_requested_at = null
   where id = share_id and owner_id = auth.uid() and transfer_requested_at is not null;
+  return found;
+end;
+$$;
+
+-- Recipient requests edit access (view-only share). Owner can approve or decline later.
+create or replace function public.request_edit_access(share_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.loan_shares
+  set edit_requested_at = now(), edit_requested_by = auth.uid()
+  where id = share_id and recipient_id = auth.uid() and permission = 'view'
+    and expires_at > now() and used_at is not null
+    and edit_requested_at is null and edit_request_resolved_at is null;
+  return found;
+end;
+$$;
+
+-- Owner approves edit request: set permission to edit, clear request, set resolution for recipient banner.
+create or replace function public.approve_edit_request(share_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.loan_shares
+  set permission = 'edit',
+      edit_requested_at = null, edit_requested_by = null,
+      edit_request_resolved_at = now(), edit_request_outcome = 'approved'
+  where id = share_id and owner_id = auth.uid() and edit_requested_at is not null;
+  return found;
+end;
+$$;
+
+-- Owner declines edit request. Recipient sees resolution banner.
+create or replace function public.decline_edit_request(share_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.loan_shares
+  set edit_requested_at = null, edit_requested_by = null,
+      edit_request_resolved_at = now(), edit_request_outcome = 'declined'
+  where id = share_id and owner_id = auth.uid() and edit_requested_at is not null;
+  return found;
+end;
+$$;
+
+-- Recipient marks resolution as seen (so we do not show the banner again).
+create or replace function public.mark_edit_resolution_seen(share_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.loan_shares
+  set recipient_seen_resolution_at = now()
+  where id = share_id and recipient_id = auth.uid() and edit_request_resolved_at is not null and recipient_seen_resolution_at is null;
   return found;
 end;
 $$;
