@@ -28,7 +28,10 @@ Lendpile is built with care. The calculations are there to help you plan and und
 
 ## Deploy (e.g. Cloudflare Pages)
 
-Static HTML/CSS/JS—no build step. Provide Supabase URL and anon key via environment variables or a build step that writes `config.js`; don’t commit real keys. Set Supabase Site URL and redirect URLs to your deployed app URL (e.g. `https://yoursite.com/app.html`).
+1. **Connect the repo** to Cloudflare Pages (Workers & Pages → Create → Pages → Connect to Git → choose this repo).
+2. **Build settings:** Framework preset **None**, Build command **`node scripts/write-config.js`**, Build output directory **`/`**.
+3. **Environment variables** (Advanced): add **`SUPABASE_URL`** and **`SUPABASE_ANON_KEY`** with your Supabase project URL and anon key (Dashboard → Project Settings → API). The build script writes these into `config.js` at deploy time so keys stay out of the repo.
+4. **Supabase:** In Authentication → URL Configuration, set Site URL and redirect URLs to your Pages URL (e.g. `https://lendpile.pages.dev/app.html`).
 
 ## Security
 
@@ -52,12 +55,13 @@ Sign in to sync your data when you use the app on another browser or device. Cho
 | `privacy.html` | Privacy policy and disclaimer. |
 | `faq.html` | Help & FAQ (how to use the tool). |
 | `assets/` | Favicon, logo (`lendpile.svg`), and screenshot. |
-| `config.example.js` | Config template; copy to `config.js` and add your Supabase URL and anon key. |
+| `scripts/write-config.js` | Build script: reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from env and writes `config.js` (for Cloudflare Pages or other CI). |
+| `config.example.js` | Config template; copy to `config.js` and add your Supabase URL and anon key (for local dev). |
 | `docs/supabase-schema.sql` | Supabase table and RLS; run once in SQL Editor. |
 | `docs/check-schema.sql` | Optional: check live DB schema. |
 | `PROJECT_OUTLINE.md` | Overview and roadmap. |
 
-- **CSS/JS:** In each HTML file so the app deploys as static files with no build step.
+- **CSS/JS:** In each HTML file. For deployment, the only “build” step is `node scripts/write-config.js` to generate `config.js` from env vars.
 - **Ignored:** `config.js` (secrets). Optional dev/review files (e.g. `docs/verify-*.js`, some `docs/*.md`) are in `.gitignore`; remove those lines if you want them in the repo.
 
 ## License
