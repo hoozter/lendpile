@@ -1288,6 +1288,23 @@
       opacity: 0.8;
       margin: 0;
     }
+    #login-modal .login-share-landing {
+      margin-bottom: 24px;
+      padding: 16px 18px;
+      border-radius: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+    }
+    #login-modal .login-share-preview-text,
+    #login-modal .login-share-invalid-text {
+      margin: 0;
+      font-size: 14px;
+      color: var(--text-color);
+      line-height: 1.45;
+    }
+    #login-modal .login-share-invalid-text {
+      color: var(--error-color, #c0392b);
+    }
     #login-modal .login-form-group {
       margin-bottom: 18px;
     }
@@ -2224,7 +2241,10 @@
       <div class="login-header">
         <h2 data-translate="loginTitle">Log in</h2>
         <p data-translate="loginSubtitle">Sign in to sync your loans across devices.</p>
-        <p id="login-share-message" class="login-share-message hidden" data-translate="signInToViewShare">Sign in to open this shared loan.</p>
+      </div>
+      <div id="login-share-landing" class="login-share-landing hidden">
+        <p id="login-share-preview-text" class="login-share-preview-text"></p>
+        <p id="login-share-invalid-text" class="login-share-invalid-text hidden" data-translate="sharedLinkExpired">This link has expired or is invalid.</p>
       </div>
       <form id="login-form">
         <div class="login-form-group">
@@ -2795,6 +2815,7 @@
           shareExpired: 'utgången',
           copyLink: 'Kopiera länk',
           signInToViewShare: 'Logga in för att öppna det delade lånet.',
+          sharedLoanWithYouIntro: 'delade ett lån med dig:',
           sharedLoanBanner: '{name} delar detta lån med dig.',
           sharedLoanSaveChanges: 'Spara ändringar',
           sharedLinkExpired: 'Länken har gått ut eller är ogiltig.',
@@ -3082,6 +3103,7 @@
           shareExpired: 'expired',
           copyLink: 'Copy link',
           signInToViewShare: 'Sign in to open this shared loan.',
+          sharedLoanWithYouIntro: 'shared a loan with you:',
           sharedLoanBanner: '{name} shared this loan with you.',
           sharedLoanSaveChanges: 'Save changes',
           sharedLinkExpired: 'This link has expired or is invalid.',
@@ -5552,10 +5574,35 @@
       if (!localStorage.getItem("offlineMode")) {
         const user = await AuthService.getUser();
         if (!user) {
-          const shareMsg = document.getElementById("login-share-message");
-          if (shareMsg) {
-            shareMsg.style.display = window._pendingShareToken ? "block" : "none";
-            shareMsg.textContent = LanguageService.translate("signInToViewShare");
+          const shareLanding = document.getElementById("login-share-landing");
+          const previewText = document.getElementById("login-share-preview-text");
+          const invalidText = document.getElementById("login-share-invalid-text");
+          if (window._pendingShareToken && shareLanding && previewText && invalidText) {
+            shareLanding.classList.remove("hidden");
+            previewText.classList.add("hidden");
+            invalidText.classList.add("hidden");
+            try {
+              const { data: preview, error } = await supabaseClient.rpc("get_share_preview", { share_token: window._pendingShareToken });
+              if (error || !preview) {
+                previewText.classList.add("hidden");
+                invalidText.classList.remove("hidden");
+                invalidText.textContent = LanguageService.translate("sharedLinkExpired");
+              } else {
+                const owner = preview.owner_display_name || LanguageService.translate("someone");
+                const loanName = preview.loan_name || LanguageService.translate("loan");
+                const intro = LanguageService.translate("sharedLoanWithYouIntro");
+                const signIn = LanguageService.translate("signInToViewShare");
+                previewText.textContent = `${owner} ${intro} ${loanName}. ${signIn}`;
+                previewText.classList.remove("hidden");
+                invalidText.classList.add("hidden");
+              }
+            } catch (e) {
+              previewText.classList.add("hidden");
+              invalidText.classList.remove("hidden");
+              invalidText.textContent = LanguageService.translate("sharedLinkExpired");
+            }
+          } else if (shareLanding) {
+            shareLanding.classList.add("hidden");
           }
           document.body.style.overflow = "hidden";
           loginModal.style.display = "flex";

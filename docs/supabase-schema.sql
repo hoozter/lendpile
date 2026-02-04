@@ -175,6 +175,29 @@ begin
 end;
 $$;
 
+-- Share landing preview: public, no auth. Returns owner name and loan name for a valid token.
+create or replace function public.get_share_preview(share_token text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  row record;
+begin
+  select owner_display_name, loan_snapshot into row
+  from public.loan_shares
+  where token = share_token and expires_at > now();
+  if not found then
+    return null;
+  end if;
+  return json_build_object(
+    'owner_display_name', row.owner_display_name,
+    'loan_name', row.loan_snapshot->>'name'
+  );
+end;
+$$;
+
 -- Update owner's loan when recipient (with edit permission) saves.
 create or replace function public.update_shared_loan(share_token text, loan_json jsonb)
 returns boolean
