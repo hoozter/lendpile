@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Lendpile – a clear loan and amortization tracker. Plan what you borrow or lend, see schedules and charts. Optional account to sync your data when you sign in." />
+  <title>Lendpile – Loan &amp; amortization tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=League+Spartan:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --lp-bg: #e8ecf0;
+      --lp-card: #fff;
+      --lp-text: #1a1a1a;
+      --lp-muted: #555;
+      --lp-primary: #00A1FF;
+      --lp-primary-hover: #357ab8;
+      --lp-border: #d0d7de;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --lp-bg: #1e1e1e;
+        --lp-card: #2c2c2c;
+        --lp-text: #f0f0f0;
+        --lp-muted: #9ca3af;
+        --lp-border: #444;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Roboto", sans-serif;
+      background: var(--lp-bg);
+      color: var(--lp-text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .lp-wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 48px; }
+    .lp-header {
+      text-align: center;
+      padding: 48px 0 32px;
+    }
+    .lp-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      text-decoration: none;
+      color: var(--lp-text);
+    }
+    .lp-logo img { height: 55px; width: auto; }
+    .lp-logo span {
+      font-family: "League Spartan", sans-serif;
+      font-weight: 600;
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+    }
+    .lp-tagline {
+      font-size: 1.15rem;
+      color: var(--lp-muted);
+      margin-bottom: 28px;
+      font-weight: 400;
+    }
+    .lp-cta {
+      display: inline-block;
+      padding: 14px 28px;
+      background: var(--lp-primary);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    .lp-cta:hover { background: var(--lp-primary-hover); color: #fff; }
+    .lp-section {
+      background: var(--lp-card);
+      border-radius: 12px;
+      padding: 28px 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--lp-border);
+    }
+    .lp-section h2 {
+      font-family: "League Spartan", sans-serif;
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--lp-primary);
+    }
+    .lp-section p { color: var(--lp-muted); margin-bottom: 12px; }
+    .lp-section p:last-child { margin-bottom: 0; }
+    .lp-features {
+      list-style: none;
+      margin-top: 12px;
+    }
+    .lp-features li {
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+      color: var(--lp-text);
+    }
+    .lp-features li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 14px;
+      width: 6px;
+      height: 6px;
+      background: var(--lp-primary);
+      border-radius: 50%;
+    }
+    .lp-cta-wrap { margin-top: 16px; }
+    .lp-footer-byline { margin-top: 8px; }
+    .lp-screenshot {
+      background: var(--lp-bg);
+      border: 1px dashed var(--lp-border);
+      border-radius: 8px;
+      aspect-ratio: 16/10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--lp-muted);
+      font-size: 0.95rem;
+      margin-top: 16px;
+    }
+    .lp-screenshot img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+      padding: 5px;
+    }
+    .lp-footer {
+      text-align: center;
+      padding: 32px 0 24px;
+      color: var(--lp-muted);
+      font-size: 0.9rem;
+    }
+    .lp-footer a { color: var(--lp-primary); text-decoration: none; }
+    .lp-footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="lp-wrap">
+    <header class="lp-header">
+      <a href="app.html" class="lp-logo">
+        <img src="assets/lendpile.svg" alt="Lendpile" />
+      </a>
+      <p class="lp-tagline">A clear loan and amortization tracker. Plan what you borrow or lend, see schedules and charts—and optionally sign in with an account to keep your data in sync.</p>
+      <a href="app.html" class="lp-cta">Open app</a>
+    </header>
+
+    <section class="lp-section" aria-labelledby="what-heading">
+      <h2 id="what-heading">What it does</h2>
+      <p>Track loans you take out or give to others. Set amounts, interest rates, and start dates, then add amortization plans (one-off or recurring) to see exactly what you’ll pay and when.</p>
+      <ul class="lp-features">
+        <li>Borrowing and lending in one place</li>
+        <li>Interest and loan amount changes over time</li>
+        <li>Amortization table and chart per loan</li>
+        <li>Export and import your data</li>
+        <li>Optional account—sign in on any browser to sync your data</li>
+        <li>Share a loan with someone or transfer ownership</li>
+      </ul>
+    </section>
+
+    <section class="lp-section" aria-labelledby="screenshot-heading">
+      <h2 id="screenshot-heading">See it in action</h2>
+      <p>Your loans at a glance, with schedules and charts when you open the app.</p>
+      <div class="lp-screenshot" aria-hidden="true">
+        <img src="assets/screenshot.png" alt="Lendpile app showing loan summary" />
+      </div>
+    </section>
+
+    <section class="lp-section" aria-labelledby="start-heading">
+      <h2 id="start-heading">Get started</h2>
+      <p>No sign-up required to try it: open the app and add a loan. Create an account when you want your data to sync (e.g. on another browser or device) or to share a loan.</p>
+      <p class="lp-cta-wrap"><a href="app.html" class="lp-cta">Open app</a></p>
+    </section>
+
+    <footer class="lp-footer">
+      <p><a href="privacy.html">Privacy &amp; disclaimer</a> · <a href="faq.html">Help &amp; FAQ</a></p>
+      <p class="lp-footer-byline">By <a href="https://hoozter.com" rel="noopener noreferrer">hoozter</a>. Designed in Sweden. Free to use.</p>
+    </footer>
+  </div>
+</body>
+</html>

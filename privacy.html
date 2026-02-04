@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Privacy &amp; disclaimer – Lendpile</title>
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --text: #333;
+      --link: #00A1FF;
+      --link-hover: #357ab8;
+      --border: #e0e0e0;
+      --box-bg: #e8ecf0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --text: #f0f0f0;
+        --link: #00A1FF;
+        --link-hover: #5eb3ff;
+        --border: #444;
+        --box-bg: #2c2c2c;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; max-width: 720px; margin: 0 auto; min-height: 100vh; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    h2 { font-size: 1.15rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    p, li { margin-bottom: 0.75rem; }
+    ul { margin-left: 1.25rem; }
+    a { color: var(--link); }
+    a:hover { color: var(--link-hover); }
+    .back { display: inline-block; margin-bottom: 1.5rem; }
+    .intro { margin-bottom: 1rem; opacity: 0.9; }
+    .disclaimer-box { background: var(--box-bg); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <a class="back" href="app.html">← Back to Lendpile</a>
+
+  <h1>Privacy &amp; disclaimer</h1>
+  <p class="intro">This page explains how we handle your data and the disclaimer that applies when you use it.</p>
+
+  <h2>Disclaimer</h2>
+  <div class="disclaimer-box">
+    <p>Lendpile is designed to give you clear amortization schedules and projections so you can plan and understand your loans. We've carefully built and tested the calculations and believe they are correct.</p>
+    <p>Even so, Lendpile is a planning tool, not a substitute for your lender or a qualified financial or legal adviser. For any decision that matters—amounts, dates, interest, contracts—please confirm the numbers with your bank or adviser. We are not liable for any loss or damage arising from your use of Lendpile or reliance on its results. By using Lendpile you do so at your own risk.</p>
+  </div>
+
+  <h2>Who’s behind Lendpile?</h2>
+  <p>Lendpile is made by <strong><a href="https://hoozter.com" rel="noopener noreferrer">hoozter</a></strong>, designed in Sweden. For questions about your data or this page: <a href="mailto:hello@hoozter.com">hello@hoozter.com</a>.</p>
+
+  <h2>What data we have</h2>
+  <ul>
+    <li><strong>Account:</strong> Email (and optionally display name and recovery email) so you can sign in and recover your account.</li>
+    <li><strong>Your loans:</strong> The loans and schedules you create. When you’re signed in, that’s stored so you can use it on other devices.</li>
+    <li><strong>Tracking:</strong> We don’t track or analyse how you use the web. Lendpile is hosted on Cloudflare; for any logging or data that Cloudflare may collect (e.g. requests, IP addresses), see <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener noreferrer">Cloudflare’s Privacy Policy</a>.</li>
+  </ul>
+
+  <h2>Emails we send</h2>
+  <p>We use your email for account-related messages (e.g. sign-in, password reset, recovery). We may also send you emails about the service when we think you need to know—for example if we shut down Lendpile, move it elsewhere, or make a significant change. We won’t use your email for marketing or unrelated stuff.</p>
+
+  <h2>How long we keep it</h2>
+  <p>We keep your data until you delete your account or ask us to delete it. After that we remove it. We’re not a company with legal retention requirements—when you ask for deletion, we delete.</p>
+
+  <h2>Your rights (e.g. GDPR)</h2>
+  <p>You can ask for a copy of your data, correct it, or ask us to delete it. In the app you’ll have options to download your data or delete your account; you can also email us.</p>
+
+  <h2>Security and recovery</h2>
+  <p>We use HTTPS and Supabase for auth and storage; we don’t store your password. Reset and recovery links are only sent to the email on your account (or a recovery email you’ve added). We won’t send a reset link to a new email unless we’ve verified it’s you (e.g. via recovery codes or information only you would know).</p>
+
+  <a class="back" href="app.html">← Back to Lendpile</a>
+</body>
+</html>

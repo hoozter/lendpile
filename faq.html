@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Help &amp; FAQ – Lendpile</title>
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --text: #333;
+      --link: #00A1FF;
+      --link-hover: #357ab8;
+      --border: #e0e0e0;
+      --box-bg: #e8ecf0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --text: #f0f0f0;
+        --link: #00A1FF;
+        --link-hover: #5eb3ff;
+        --border: #444;
+        --box-bg: #2c2c2c;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; max-width: 720px; margin: 0 auto; min-height: 100vh; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.05rem; margin-top: 1.25rem; margin-bottom: 0.35rem; color: var(--link); }
+    p, li { margin-bottom: 0.6rem; }
+    ul { margin-left: 1.25rem; }
+    a { color: var(--link); }
+    a:hover { color: var(--link-hover); }
+    .back { display: inline-block; margin-bottom: 1.5rem; }
+    .intro { margin-bottom: 1.25rem; opacity: 0.9; }
+    .faq-section { margin-bottom: 1rem; }
+    .faq-privacy-link { margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <a class="back" href="app.html">← Back to Lendpile</a>
+
+  <h1>Help &amp; FAQ</h1>
+  <p class="intro">How to use Lendpile: add loans, set interest and amortization, and see your schedule.</p>
+
+  <div class="faq-section">
+    <h2>How do I add a loan?</h2>
+    <p>Click <strong>Add Loan</strong> on the main screen. Enter the loan name, start date, amount, currency, and at least one interest rate (with a date). For a fixed rate from the start, one row is enough. Save when done.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>How do I change the interest rate over time?</h2>
+    <p>When adding or editing a loan, use the <strong>Interest</strong> section. Add a row for each change: date and rate (%). The table and chart will use the rate that applies on each date. Use the three-dot menu on a row to edit or delete it.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>What are loan changes?</h2>
+    <p>Loan changes are extra drawdowns or repayments that change the principal (the amount you owe). Add them in the <strong>Loan changes</strong> section with a date and amount (positive for more borrowing, negative for a repayment). They affect the remaining debt and the rest of the schedule.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>How do I add an amortization schedule?</h2>
+    <p>Open a loan, go to the <strong>Amortizations</strong> tab, and click <strong>Add Amortization</strong>. Choose <strong>One-time</strong> for a single extra payment on a date, or <strong>Scheduled</strong> for recurring payments (e.g. monthly on the 27th). Set amount, start date, and optionally an end date.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>One-time vs scheduled amortization?</h2>
+    <p><strong>One-time</strong> is a single payment on a chosen date. <strong>Scheduled</strong> repeats (e.g. every month or every two weeks) from a start date until you say otherwise or add an end date. You can have both on the same loan.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>What does “Payment this month” mean?</h2>
+    <p>It’s the total payment due in the <em>current</em> month. If a schedule hasn’t started yet (e.g. starts next month), this month’s value can be zero while the amortization card still shows the future monthly amount and when it starts.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>How do I share a loan with someone?</h2>
+    <p>Open the loan, open the three-dot menu (top right), and choose <strong>Share loan</strong>. Create a link and set whether the recipient can only view or can edit. Send them the link; they can open it in a browser. You can revoke or change the link later from Settings.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>Where is my data stored?</h2>
+    <p>If you don’t sign in, data stays in your browser (local storage). If you sign in, it’s stored in your account so you can use it on other devices. You can export your data from the account/settings area anytime.</p>
+  </div>
+
+  <div class="faq-section">
+    <h2>I’m lending money to someone—how do I set that up?</h2>
+    <p>When adding the loan, choose <strong>I am lending</strong>. The same fields apply: you’re the lender and the “remaining debt” is what’s owed to you. The summary can show “Owed to you” and “Incoming this month” instead of “Remaining debt” and “Payment this month”.</p>
+  </div>
+
+  <p class="faq-privacy-link"><a href="privacy.html">Privacy &amp; disclaimer</a></p>
+  <a class="back" href="app.html">← Back to Lendpile</a>
+</body>
+</html>

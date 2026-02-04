@@ -1,0 +1,9 @@
+# Supabase config – contains secrets; never commit
+config.js
+
+# Internal / dev-only (optional: remove these lines to commit them)
+docs/verify-campbell-loan.js
+docs/verify-campbell-loan.py
+docs/CALCULATION_REVIEW.md
+docs/CODE_REVIEW.md
+docs/FEATURE_ROADMAP.md
