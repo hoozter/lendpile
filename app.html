@@ -2900,6 +2900,7 @@
           decline: 'Avböj',
           ok: 'OK',
           viewOnlyRequestEdit: 'Endast visa. Begär redigeringsåtkomst från {name}?',
+          viewOnlyCantEdit: 'Endast visa. Begär redigeringsåtkomst för att göra ändringar.',
           requestEditAccess: 'Begär redigeringsåtkomst',
           requestAlreadySent: 'Begäran skickad. {name} kan bevilja åtkomst från delningsinställningarna.',
           transferToRecipient: 'Överför till mottagare',
@@ -3208,6 +3209,7 @@
           decline: 'Decline',
           ok: 'OK',
           viewOnlyRequestEdit: 'View-only. Request edit access from {name}?',
+          viewOnlyCantEdit: 'View-only. Request edit access to make changes.',
           requestEditAccess: 'Request edit access',
           requestAlreadySent: 'Request sent. {name} can grant access from share settings.',
           transferToRecipient: 'Transfer to recipient',
@@ -3876,6 +3878,21 @@
         document.querySelectorAll(".modal-lock-control").forEach(control => {
           control.addEventListener("click", e => UIHandler.handleLockControlClick(e));
         });
+        document.addEventListener("click", function viewOnlyFieldClick(ev) {
+          const form = ev.target.closest?.("form[data-shared-view-only]");
+          if (!form) return;
+          if (ev.target.matches("input, select, textarea, button") && ev.target.disabled) {
+            ev.preventDefault();
+            UIHandler.showFeedback(LanguageService.translate("viewOnlyCantEdit") || "View-only. Request edit access to make changes.");
+          }
+        }, true);
+        document.addEventListener("focusin", function viewOnlyFieldFocus(ev) {
+          const form = ev.target.closest?.("form[data-shared-view-only]");
+          if (!form) return;
+          if (ev.target.matches("input, select, textarea") && ev.target.disabled) {
+            UIHandler.showFeedback(LanguageService.translate("viewOnlyCantEdit") || "View-only. Request edit access to make changes.");
+          }
+        }, true);
         document.querySelectorAll(".modal").forEach(modal => {
           modal.addEventListener("click", function(e) {
             if (e.target !== modal) return;
@@ -3892,6 +3909,8 @@
       },
       handleLockControlClick(e) {
         const control = e.currentTarget;
+        const form = control.closest(".modal")?.querySelector("form");
+        if (form?.getAttribute("data-shared-view-only")) return;
         this._pendingLockControl = control;
         if (control.classList.contains("locked")) {
           UIHandler.showModal("unlock-confirmation-modal");
@@ -4280,9 +4299,10 @@
         const loan = this.getCurrentLoan();
         if (!loan) return;
         const index = this.currentDetailLoanIndex != null ? this.currentDetailLoanIndex : 0;
+        const canEditShared = !this.currentShare || this.currentShare.share?.permission !== "view";
         const activeTab = (document.querySelector(".loan-detail-tab.active") || {}).getAttribute("data-tab") || "overview";
         const overviewHtml = this.createDetailOverview(loan, index);
-        const amortizationsHtml = this.createDetailAmortizations(loan, index);
+        const amortizationsHtml = this.createDetailAmortizations(loan, index, canEditShared);
         const targetHtml = this.createDetailTarget(loan, index);
         const chartHtml = this.createDetailChart(index);
         document.getElementById("loan-detail-content").innerHTML = `
@@ -4400,7 +4420,7 @@
           </div>
         `;
       },
-      createDetailAmortizations(loan, index) {
+      createDetailAmortizations(loan, index, canEdit) {
         const timeline = CalculationService.buildTimeline(loan);
         const tableHtml = timeline.length ? UIHandler.createTimelineTable(timeline, loan.currency, loan) : `<p>${LanguageService.translate("noAmortizationPlan")}</p>`;
         return `
@@ -4409,7 +4429,7 @@
             ${tableHtml}
             <div class="loan-detail-payment-plans">
               <h4 class="amortizations-section-title">${LanguageService.translate("paymentPlans")}</h4>
-              ${UIHandler.createAmortizationListContent(loan, index)}
+              ${UIHandler.createAmortizationListContent(loan, index, canEdit !== false)}
             </div>
           </div>
         `;
@@ -4650,17 +4670,10 @@
         if (freq === 3) return LanguageService.translate("triMonthlyPayment");
         return LanguageService.translate("everyMonthsPayment").replace("{freq}", freq);
       },
-      createAmortRow(loan, payment, loanIndex, paymentIndex) {
+      createAmortRow(loan, payment, loanIndex, paymentIndex, canEdit = true) {
         const status = UIHandler.derivePaymentStatus(loan, payment);
         const inactiveClass = (payment.endDate && (new Date(payment.endDate) < new Date())) ? " inactive-payment" : "";
-        return `
-          <tr class="${inactiveClass}">
-            <td>${UIHandler.formatCurrency(payment.amount, loan.currency)}</td>
-            <td>${UIHandler.formatDate(payment.startDate)}</td>
-            <td>${payment.endDate ? UIHandler.formatDate(payment.endDate) : "-"}</td>
-            <td>${payment.type === "scheduled" ? LanguageService.translate("scheduledAmortization") : LanguageService.translate("oneTimeAmortization")}</td>
-            <td>${payment.type === "scheduled" ? UIHandler.getPaymentFrequencyLabel(payment) : "-"}</td>
-            <td>${UIHandler.derivePaymentStatus(loan, payment)}</td>
+        const actionsCell = canEdit ? `
             <td>
               <div class="payment-plan-menu-wrap" data-loan-index="${loanIndex}" data-payment-index="${paymentIndex}">
                 <button type="button" class="payment-plan-menu-btn" aria-haspopup="true" aria-expanded="false" title="${LanguageService.translate("actions")}">
@@ -4672,7 +4685,16 @@
                   <button type="button" role="menuitem" data-action="delete">${LanguageService.translate("delete")}</button>
                 </div>
               </div>
-            </td>
+            </td>` : `<td>-</td>`;
+        return `
+          <tr class="${inactiveClass}">
+            <td>${UIHandler.formatCurrency(payment.amount, loan.currency)}</td>
+            <td>${UIHandler.formatDate(payment.startDate)}</td>
+            <td>${payment.endDate ? UIHandler.formatDate(payment.endDate) : "-"}</td>
+            <td>${payment.type === "scheduled" ? LanguageService.translate("scheduledAmortization") : LanguageService.translate("oneTimeAmortization")}</td>
+            <td>${payment.type === "scheduled" ? UIHandler.getPaymentFrequencyLabel(payment) : "-"}</td>
+            <td>${UIHandler.derivePaymentStatus(loan, payment)}</td>
+            ${actionsCell}
           </tr>
         `;
       },
@@ -4688,11 +4710,11 @@
         }
         return LanguageService.translate("active");
       },
-      createAmortizationListContent(loan, loanIndex) {
-        const addBtn = `<button type="button" class="btn-add-amortization btn-primary" data-loan-index="${loanIndex}" data-action="add-amortization">
+      createAmortizationListContent(loan, loanIndex, canEdit = true) {
+        const addBtn = canEdit ? `<button type="button" class="btn-add-amortization btn-primary" data-loan-index="${loanIndex}" data-action="add-amortization">
           <span class="material-icons">add</span>
           <span>${LanguageService.translate("add")}</span>
-        </button>`;
+        </button>` : "";
         if (!loan.payments || !loan.payments.length) {
           return `<div class="payment-plans-header">${addBtn}</div>
                   <p>${LanguageService.translate("noAmortizations")}</p>`;
@@ -4714,7 +4736,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${loan.payments.map((payment, i) => UIHandler.createAmortRow(loan, payment, loanIndex, i)).join("")}
+                  ${loan.payments.map((payment, i) => UIHandler.createAmortRow(loan, payment, loanIndex, i, canEdit)).join("")}
                 </tbody>
               </table>
             </div>
@@ -5387,7 +5409,8 @@
           <button type="button" class="btn-primary view-only-request-btn" id="view-only-request-btn" ${alreadyRequested ? "disabled" : ""}>${alreadyRequested ? (LanguageService.translate("requestAlreadySent") || "Request sent").replace("{name}", ownerName) : LanguageService.translate("requestEditAccess")}</button>
         `;
         if (!alreadyRequested) {
-          lockWrap.querySelector("#view-only-request-btn").addEventListener("click", async () => {
+          lockWrap.querySelector("#view-only-request-btn").addEventListener("click", async (ev) => {
+            ev.stopPropagation();
             const r = await ShareService.requestEditAccess(shareId);
             if (r.error) UIHandler.showFeedback(r.error);
             else {
@@ -5398,6 +5421,10 @@
           });
         }
         UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
+        ["loanName", "loanCurrency"].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.closest(".form-row")?.classList.add("locked-field-container");
+        });
         UIHandler.showModal("loan-modal");
       },
       async duplicateLoan(index) {
@@ -6758,6 +6785,7 @@
         const paymentPlanItem = e.target.closest(".payment-plan-menu button[data-action]");
         if (paymentPlanItem) {
           e.stopPropagation();
+          if (UIHandler.currentShare && UIHandler.currentShare.share?.permission === "view") return;
           const wrap = paymentPlanItem.closest(".payment-plan-menu-wrap");
           const menu = wrap && wrap.querySelector(".payment-plan-menu");
           if (menu) menu.classList.remove("open");
@@ -6788,6 +6816,7 @@
         const addAmortBtn = e.target.closest(".btn-add-amortization");
         if (addAmortBtn) {
           e.stopPropagation();
+          if (UIHandler.currentShare && UIHandler.currentShare.share?.permission === "view") return;
           const loanIndex = parseInt(addAmortBtn.getAttribute("data-loan-index"), 10);
           if (!isNaN(loanIndex)) FormHandler.openAmortizationForm(loanIndex);
           return;
