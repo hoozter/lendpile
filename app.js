@@ -30,10 +30,11 @@ const AuthService = {
     if (error) return { success: false, error: error.message };
     return { success: true, data };
   },
-  async signUp(email, password, displayName) {
+  async signUp(email, password, displayName, emailRedirectTo) {
     if (!supabaseClient) return { success: false, error: "Supabase not configured. Copy config.example.js to config.js." };
     const payload = { email, password };
     if (displayName && displayName.trim()) payload.data = { display_name: displayName.trim() };
+    if (emailRedirectTo) payload.options = { emailRedirectTo };
     const { data, error } = await supabaseClient.auth.signUp(payload);
     if (error) return { success: false, error: error.message };
     return { success: true, data };
@@ -4941,7 +4942,11 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
     feedback.className = "error";
     return;
   }
-  const result = await AuthService.signUp(email, password, displayName);
+  const shareToken = window._pendingShareToken;
+  const emailRedirectTo = shareToken
+    ? (window.location.origin + window.location.pathname + "?share=" + encodeURIComponent(shareToken))
+    : undefined;
+  const result = await AuthService.signUp(email, password, displayName, emailRedirectTo);
   if (result.success) {
     feedback.textContent = LanguageService.translate("signUpSuccess");
     feedback.className = "success";
