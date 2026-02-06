@@ -1306,6 +1306,9 @@ th, td {
   color: var(--text-color);
   line-height: 1.45;
 }
+#login-modal .login-share-preview-text {
+  white-space: pre-line;
+}
 #login-modal .login-share-invalid-text {
   color: var(--error-color, #c0392b);
 }

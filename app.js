@@ -492,6 +492,11 @@ const LanguageService = {
       duplicate: 'Duplicera',
       shareLoan: 'Dela lån',
       shareLoanHelp: 'Skapa en tidsbegränsad, engångslänk. Mottagaren ser vem som delar och kan öppna lånet (endast visa eller redigera).',
+      shareDisplayNameHint: 'Mottagaren ser ditt visningsnamn när de öppnar länken. Om du inte har angett ett visas din e-postadress i stället. Du kan ange visningsnamn under Konto.',
+      shareEmailShownTitle: 'Visningsnamn inte angivet',
+      shareEmailShownMessage: 'Din e-postadress visas för mottagaren. Lägg till ett visningsnamn under Konto så att de ser ditt namn i stället.',
+      shareAddDisplayName: 'Lägg till visningsnamn',
+      shareCreateLinkAnyway: 'Skapa länk ändå',
       sharePermission: 'Behörighet',
       shareViewOnly: 'Endast visa',
       shareCanEdit: 'Kan redigera',
@@ -536,7 +541,8 @@ const LanguageService = {
       shareExpired: 'utgången',
       copyLink: 'Kopiera länk',
       signInToViewShare: 'Logga in för att öppna det delade lånet.',
-      sharedLoanWithYouIntro: 'delade ett lån med dig:',
+      sharedLoanPreviewIntro: 'delade ett lån med dig.',
+      sharedLoanPreviewTitleLabel: 'Låntitel:',
       sharedBy: 'Delad av {name}',
       sharedLoanBanner: '{name} delar detta lån med dig.',
       sharedLoanSaveChanges: 'Spara ändringar',
@@ -815,6 +821,11 @@ const LanguageService = {
       duplicate: 'Duplicate',
       shareLoan: 'Share loan',
       shareLoanHelp: 'Create a time-limited, one-time link. The recipient will see who is sharing and can open the loan (view only or can edit).',
+      shareDisplayNameHint: 'Recipients will see your display name when they open the link. If you haven\'t set one, your email address will be shown instead. You can set a display name in Account.',
+      shareEmailShownTitle: 'Display name not set',
+      shareEmailShownMessage: 'Your email address will be shown to the recipient. Add a display name in Account so they see your name instead.',
+      shareAddDisplayName: 'Add display name',
+      shareCreateLinkAnyway: 'Create link anyway',
       sharePermission: 'Permission',
       shareViewOnly: 'View only',
       shareCanEdit: 'Can edit',
@@ -859,7 +870,8 @@ const LanguageService = {
       shareExpired: 'expired',
       copyLink: 'Copy link',
       signInToViewShare: 'Sign in to open this shared loan.',
-      sharedLoanWithYouIntro: 'shared a loan with you:',
+      sharedLoanPreviewIntro: 'shared a loan with you.',
+      sharedLoanPreviewTitleLabel: 'Loan title:',
       sharedBy: 'Shared by {name}',
       sharedLoanBanner: '{name} shared this loan with you.',
       sharedLoanSaveChanges: 'Save changes',
@@ -2405,9 +2417,9 @@ const UIHandler = {
     document.getElementById(id).style.display = "none";
     this.restoreBodyScroll();
   },
-  /** Show HTML confirm modal (replaces window.confirm). Options: { title, message?, confirmLabel, confirmClass? ('btn-primary'|'btn-delete'), onConfirm: async () => {} } */
+  /** Show HTML confirm modal (replaces window.confirm). Options: { title, message?, confirmLabel, confirmClass?, cancelLabel?, onConfirm, onCancel? } */
   showConfirmModal(options) {
-    const { title, message = "", confirmLabel, confirmClass = "btn-primary", onConfirm } = options;
+    const { title, message = "", confirmLabel, confirmClass = "btn-primary", cancelLabel, onConfirm, onCancel } = options;
     document.getElementById("generic-confirm-title").textContent = title;
     const msgEl = document.getElementById("generic-confirm-message");
     msgEl.textContent = message;
@@ -2415,11 +2427,15 @@ const UIHandler = {
     const btn = document.getElementById("generic-confirm-btn");
     btn.textContent = confirmLabel;
     btn.className = confirmClass;
+    const cancelBtn = document.getElementById("generic-confirm-cancel-btn");
+    cancelBtn.textContent = cancelLabel != null ? cancelLabel : LanguageService.translate("cancel");
     window._genericConfirmOnConfirm = onConfirm;
+    window._genericConfirmOnCancel = typeof onCancel === "function" ? onCancel : null;
     this.showModal("generic-confirm-modal");
   },
   cancelGenericConfirm() {
     window._genericConfirmOnConfirm = null;
+    window._genericConfirmOnCancel = null;
     this.closeModal("generic-confirm-modal");
   },
   /** Show security prompt: 2FA-only when they have recovery but no 2FA (emphasize securing account); combined (2FA + recovery) when they have neither. Never show if they already have 2FA. "Maybe later" re-shows after 7 days. */
@@ -3775,9 +3791,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           } else {
             const owner = preview.owner_display_name || LanguageService.translate("someone");
             const loanName = preview.loan_name || LanguageService.translate("loan");
-            const intro = LanguageService.translate("sharedLoanWithYouIntro");
+            const intro = LanguageService.translate("sharedLoanPreviewIntro");
+            const titleLabel = LanguageService.translate("sharedLoanPreviewTitleLabel");
             const signIn = LanguageService.translate("signInToViewShare");
-            previewText.textContent = `${owner} ${intro} ${loanName}. ${signIn}`;
+            previewText.textContent = `${owner} ${intro}\n${titleLabel} ${loanName}\n\n${signIn}`;
             previewText.classList.remove("hidden");
             invalidText.classList.add("hidden");
           }
@@ -4077,6 +4094,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   /* Share loan modal */
   document.getElementById("share-modal-close")?.addEventListener("click", () => UIHandler.closeModal("share-loan-modal"));
+  async function executeCreateShareLink(loan, permission, recipientView, expiresInDays) {
+    const result = await ShareService.createShare(loan, { permission, recipientView, expiresInDays });
+    const feedbackEl = document.getElementById("share-link-feedback");
+    const resultEl = document.getElementById("share-link-result");
+    if (result.error) {
+      feedbackEl.textContent = result.error;
+      feedbackEl.className = "error";
+      feedbackEl.style.display = "block";
+      resultEl.style.display = "none";
+      return;
+    }
+    document.getElementById("share-link-url").value = result.shareUrl;
+    feedbackEl.style.display = "none";
+    feedbackEl.className = "";
+    resultEl.style.display = "block";
+    UIHandler.populateShareActiveList();
+  }
   document.getElementById("share-create-link-btn")?.addEventListener("click", async () => {
     const loanIndex = UIHandler.shareLoanIndex;
     if (loanIndex == null) return;
@@ -4093,20 +4127,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     const permission = document.querySelector("#share-loan-modal input[name=share-permission]:checked")?.value || "view";
     const recipientView = document.querySelector("#share-loan-modal input[name=share-recipient-view]:checked")?.value || "borrowing";
     const expiresInDays = parseInt(document.getElementById("share-expires-days")?.value, 10) || 7;
-    const result = await ShareService.createShare(loan, { permission, recipientView, expiresInDays });
-    const feedbackEl = document.getElementById("share-link-feedback");
-    const resultEl = document.getElementById("share-link-result");
-    if (result.error) {
-      feedbackEl.textContent = result.error;
-      feedbackEl.className = "error";
-      feedbackEl.style.display = "block";
-      resultEl.style.display = "none";
+    const user = await AuthService.getUser();
+    const hasDisplayName = user && (user.user_metadata && user.user_metadata.display_name && String(user.user_metadata.display_name).trim());
+    if (!hasDisplayName && user) {
+      UIHandler.showConfirmModal({
+        title: LanguageService.translate("shareEmailShownTitle"),
+        message: LanguageService.translate("shareEmailShownMessage"),
+        confirmLabel: LanguageService.translate("shareAddDisplayName"),
+        cancelLabel: LanguageService.translate("shareCreateLinkAnyway"),
+        onConfirm: () => {
+          UIHandler.cancelGenericConfirm();
+          UIHandler.closeModal("share-loan-modal");
+          UIHandler.showModal("account-modal");
+        },
+        onCancel: () => {
+          UIHandler.cancelGenericConfirm();
+          executeCreateShareLink(loan, permission, recipientView, expiresInDays);
+        }
+      });
       return;
     }
-    document.getElementById("share-link-url").value = result.shareUrl;
-    feedbackEl.style.display = "none";
-    resultEl.style.display = "block";
-    UIHandler.populateShareActiveList();
+    await executeCreateShareLink(loan, permission, recipientView, expiresInDays);
   });
   document.getElementById("share-copy-link-btn")?.addEventListener("click", () => {
     const input = document.getElementById("share-link-url");
@@ -4568,6 +4609,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
   document.getElementById("generic-confirm-cancel-btn").addEventListener("click", () => {
+    const onCancel = window._genericConfirmOnCancel;
+    if (typeof onCancel === "function") onCancel();
     UIHandler.cancelGenericConfirm();
   });
 
