@@ -458,7 +458,7 @@ const LanguageService = {
       password: 'Lösenord',
       login: 'Logga in',
       signUp: 'Skapa konto',
-      or: 'eller',git 
+      or: 'eller',
       continueWithoutAccount: 'Fortsätt utan konto',
       signUpSuccess: 'Kontot skapat. Kontrollera din e-post för bekräftelse.',
       signUpSubtitle: 'Ange din e-post och välj ett lösenord för att spara och synka dina lån.',
