@@ -100,3 +100,34 @@ You use the URL you copied in Step 1.
 | **Pages** (Environment variables) | `DELETE_ACCOUNT_URL` | Worker URL + `/delete-my-account` (e.g. `https://lendpile-api.xxxx.workers.dev/delete-my-account`) |
 
 The Worker URL is the one Cloudflare shows on the Worker’s page after you create it (Step 1).
+
+---
+
+## Making a user an admin (optional)
+
+If you want someone to use the admin page by **logging in** (email + password, and 2FA if they use it) instead of the API key:
+
+1. In **Supabase**: **Authentication** → **Users** → click the user.
+2. **Edit** the user (or use the three-dots menu).
+3. Find **App metadata** (or **Raw user meta**). Add: `{"role": "admin"}` (or merge with existing JSON so it includes `"role": "admin"`). Save.
+
+That user can open the admin page, choose “Log in with your Lendpile account”, enter their email and password (and 2FA code if they have it), and then load users and delete users. No need to share the API key. You can have multiple admins by setting `role: admin` for each.
+
+---
+
+## Deploy the Worker from the same Git repo (optional)
+
+So that a push to GitHub deploys both the **Pages** site and the **Worker** (no manual paste in the dashboard):
+
+1. In Cloudflare, open **Workers & Pages** → click your **Worker** (e.g. `lendpile-api`).
+2. Go to **Settings** → **Build**.
+3. Under **Git repository**, click **Connect** (or **Manage** if something is already connected). Connect the same GitHub account and select the **same repo** as your Pages project (e.g. `hoozter/lendpile`).
+4. Set:
+   - **Git branch:** `main` (or the branch you use for production).
+   - **Root directory:** `worker`  
+     This makes the build run from the `worker/` folder in the repo, where `wrangler.toml` and `src/index.js` live.
+   - **Build command:** leave empty (or set to `npm install` if the deploy step fails; the `worker/` folder has a `package.json` with Wrangler).
+   - **Deploy command:** `npx wrangler deploy` (default).
+5. Save. Trigger a deploy (e.g. **Deployments** → **Create deployment**, or push a commit).
+
+From then on, when you push to the connected branch, Cloudflare will build and deploy the Worker from the `worker/` directory. The secrets you set in **Settings** → **Variables and Secrets** (SUPABASE_URL, etc.) are kept; they are not in the repo and stay in the Worker’s config. One repo, one push → Pages and Worker both update.

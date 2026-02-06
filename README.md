@@ -43,12 +43,13 @@ Users can delete their own account from the app (Settings → Delete account). T
 The repo includes a **Cloudflare Worker** (`worker/`) that:
 
 1. **POST /delete-my-account** – User sends their session JWT; the Worker verifies it and deletes that user in Supabase. Only that user’s account is deleted.
-2. **GET /admin/users** – Admin lists users (protected by a secret key).
-3. **DELETE /admin/users/:id** – Admin deletes a user by id.
+2. **GET /admin/users** – Admin lists users. Auth: API key (X-Admin-Key) or a logged-in user whose Supabase **app_metadata.role** is `admin`.
+3. **DELETE /admin/users/:id** – Admin deletes a user by id (same auth).
 
 **Deploy the Worker**
 
-- **Without a terminal:** See **[docs/CLOUDFLARE_SETUP.md](docs/CLOUDFLARE_SETUP.md)** for step-by-step setup using only the Cloudflare dashboard and GitHub (create Worker, paste code, set secrets, then add the Worker URL to Pages).
+- **From the same Git repo (recommended):** Connect the Worker to your GitHub repo in Cloudflare (**Settings** → **Build**): set **Root directory** to `worker`, leave **Build command** empty, **Deploy command** `npx wrangler deploy`. Each push then deploys both Pages and the Worker. See [docs/CLOUDFLARE_SETUP.md](docs/CLOUDFLARE_SETUP.md) (section “Deploy the Worker from the same Git repo”).
+- **Without a terminal (manual paste):** See **[docs/CLOUDFLARE_SETUP.md](docs/CLOUDFLARE_SETUP.md)** for step-by-step setup using only the Cloudflare dashboard (create Worker, paste code, set secrets, then add the Worker URL to Pages).
 - **With a terminal:** From the project root: `cd worker && npx wrangler deploy`. Set secrets (your Supabase and a chosen admin secret):
    - `npx wrangler secret put SUPABASE_URL`
    - `npx wrangler secret put SUPABASE_ANON_KEY`
@@ -58,7 +59,14 @@ The repo includes a **Cloudflare Worker** (`worker/`) that:
 
 **Admin dashboard**
 
-Open `admin.html` (e.g. `https://yoursite.pages.dev/admin.html`). Enter your `ADMIN_SECRET` as the “Admin API key”, then click “Load users” to list users and delete them if needed. The key is stored in session storage for the current tab only.
+Open `admin.html` (e.g. `https://yoursite.pages.dev/admin.html`). You can:
+
+- **Log in with a Lendpile account** that has the admin role (email + password; if that user has 2FA in the app, you’ll use it here too). No API key needed.
+- **Or** use the “Admin API key” (your `ADMIN_SECRET`) to list and delete users. The key is stored in session storage for the current tab only.
+
+**Making a user an admin**
+
+In Supabase: **Authentication** → **Users** → open the user → **Edit** (or the three-dots menu). Under **App metadata** (or **Raw User Meta**), add: `{"role": "admin"}`. Save. That user can then open the admin page, log in with their Lendpile email and password, and manage users. Enabling 2FA on that account in the app adds a second factor for admin access.
 
 **Alternative: Supabase Edge Function**
 

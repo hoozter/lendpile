@@ -1502,6 +1502,12 @@ th, td {
   vertical-align: middle;
   margin-right: 8px;
 }
+.profile-dropdown-item.profile-admin-link {
+  text-decoration: none;
+}
+.profile-dropdown-item.profile-admin-link:hover {
+  color: var(--text-color);
+}
 /* Change password modal */
 #change-password-modal .modal-content {
   max-width: 400px;

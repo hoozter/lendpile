@@ -1,8 +1,8 @@
 /**
  * Lendpile API Worker
  * - POST /delete-my-account: user deletes own account (Bearer user JWT)
- * - GET /admin/users: admin lists users (X-Admin-Key or Bearer admin secret)
- * - DELETE /admin/users/:id: admin deletes a user
+ * - GET /admin/users, DELETE /admin/users/:id: admin only.
+ *   Admin auth: (1) X-Admin-Key matching ADMIN_SECRET, or (2) Authorization: Bearer <user JWT> and user has app_metadata.role === 'admin'
  */
 
 const CORS = {
@@ -18,11 +18,29 @@ function json(body, status = 200) {
   });
 }
 
-function adminAuth(req, env) {
+/** Check API key auth (X-Admin-Key or Bearer ADMIN_SECRET). */
+function adminAuthBySecret(req, env) {
   const secret = env.ADMIN_SECRET;
-  if (!secret) return null;
+  if (!secret) return false;
   const key = req.headers.get("X-Admin-Key") || (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  return key === secret ? true : null;
+  return key === secret;
+}
+
+/** Check if user from JWT is admin (app_metadata.role === 'admin'). */
+async function adminAuthByUser(req, env) {
+  const auth = req.headers.get("Authorization");
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return false;
+  const user = await getUserFromToken(token, env);
+  if (!user) return false;
+  const role = user.app_metadata?.role;
+  return role === "admin";
+}
+
+/** Admin auth: secret key OR logged-in user with role admin. */
+async function isAdmin(req, env) {
+  if (adminAuthBySecret(req, env)) return true;
+  return await adminAuthByUser(req, env);
 }
 
 async function getUserFromToken(token, env) {
@@ -76,7 +94,7 @@ export default {
     }
 
     if (path.startsWith("/admin/users")) {
-      if (!adminAuth(req, env)) {
+      if (!(await isAdmin(req, env))) {
         return json({ error: "Unauthorized" }, 401);
       }
       if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {

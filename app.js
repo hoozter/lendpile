@@ -579,6 +579,7 @@ const LanguageService = {
       amortizationOverTime: 'Amortering över tid',
       add: 'Lägg till',
       account: 'Konto',
+      admin: 'Admin',
       loginEmail: 'Inloggnings‑e‑post',
       changeEmail: 'Ändra e‑post',
       sendVerification: 'Skicka verifiering',
@@ -910,6 +911,7 @@ const LanguageService = {
       amortizationOverTime: 'Amortization over time',
       add: 'Add',
       account: 'Account',
+      admin: 'Admin',
       setAsDefault: 'Set as default',
       default: 'Default',
       addAnotherEmail: 'Add another email',
@@ -993,6 +995,7 @@ const StorageService = {
 async function updateUserHeader() {
   const block = document.getElementById("user-header-block");
   const emailEl = document.getElementById("profile-dropdown-email");
+  const adminLink = document.getElementById("profile-admin");
   if (!block || !emailEl) return;
   const user = await AuthService.getUser();
   if (user && user.email) {
@@ -1000,10 +1003,15 @@ async function updateUserHeader() {
     const displayName = (user.user_metadata && user.user_metadata.display_name) ? String(user.user_metadata.display_name).trim() : '';
     emailEl.textContent = displayName || user.email;
     document.getElementById("profile-dropdown").classList.remove("open");
+    if (adminLink) {
+      const isAdmin = user.app_metadata && user.app_metadata.role === "admin";
+      adminLink.style.display = isAdmin ? "" : "none";
+    }
     const offlineBanner = document.getElementById("offline-banner");
     if (offlineBanner) offlineBanner.classList.add("hidden");
   } else {
     block.classList.remove("visible");
+    if (adminLink) adminLink.style.display = "none";
   }
 }
 
