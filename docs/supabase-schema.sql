@@ -123,6 +123,8 @@ create policy "Recipients can delete shares they received"
 
 -- Backfill: add recipient_email if missing (set when share is redeemed).
 do $$ begin alter table public.loan_shares add column if not exists recipient_email text; exception when others then null; end $$;
+-- Backfill: add recipient_display_name (set when share is redeemed; prefer over email when showing who accepted).
+do $$ begin alter table public.loan_shares add column if not exists recipient_display_name text; exception when others then null; end $$;
 
 -- Return share by token if valid (not expired; unused or already redeemed by this user).
 create or replace function public.get_share_by_token(share_token text)
@@ -180,6 +182,7 @@ declare
   row record;
   uid uuid;
   rec_email text;
+  rec_display_name text;
 begin
   uid := auth.uid();
   if uid is null then
@@ -193,9 +196,11 @@ begin
     return null;
   end if;
   if row.used_at is null then
-    select email into rec_email from auth.users where id = uid limit 1;
+    select u.email, coalesce(nullif(trim(u.raw_user_meta_data->>'display_name'), ''), u.email)
+      into rec_email, rec_display_name
+      from auth.users u where u.id = uid limit 1;
     update public.loan_shares
-    set used_at = now(), recipient_id = uid, recipient_email = rec_email
+    set used_at = now(), recipient_id = uid, recipient_email = rec_email, recipient_display_name = rec_display_name
     where id = row.id;
   end if;
   return public.get_share_by_token(share_token);

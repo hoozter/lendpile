@@ -30,9 +30,11 @@ const AuthService = {
     if (error) return { success: false, error: error.message };
     return { success: true, data };
   },
-  async signUp(email, password) {
+  async signUp(email, password, displayName) {
     if (!supabaseClient) return { success: false, error: "Supabase not configured. Copy config.example.js to config.js." };
-    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    const payload = { email, password };
+    if (displayName && displayName.trim()) payload.data = { display_name: displayName.trim() };
+    const { data, error } = await supabaseClient.auth.signUp(payload);
     if (error) return { success: false, error: error.message };
     return { success: true, data };
   },
@@ -163,7 +165,7 @@ const ShareService = {
     const user = await AuthService.getUser();
     if (!user) return { error: "Not signed in.", shares: [] };
     const { data, error } = await supabaseClient.from("loan_shares")
-      .select("id, token, loan_id, loan_snapshot, permission, recipient_view, expires_at, used_at, recipient_id, recipient_email, transfer_requested_at, created_at, edit_requested_at, edit_requested_by")
+      .select("id, token, loan_id, loan_snapshot, permission, recipient_view, expires_at, used_at, recipient_id, recipient_email, recipient_display_name, transfer_requested_at, created_at, edit_requested_at, edit_requested_by")
       .eq("owner_id", user.id)
       .order("created_at", { ascending: false });
     if (error) return { error: error.message, shares: [] };
@@ -462,6 +464,8 @@ const LanguageService = {
       continueWithoutAccount: 'Fortsätt utan konto',
       signUpSuccess: 'Kontot skapat. Kontrollera din e-post för bekräftelse.',
       signUpSubtitle: 'Ange din e-post och välj ett lösenord för att spara och synka dina lån.',
+      displayNameOptional: 'Visningsnamn (valfritt)',
+      displayNameUsedForSharing: 'Visas när du delar lån med andra.',
       choosePassword: 'Välj ett lösenord',
       noAccountCreateOne: 'Har du inget konto? Skapa ett',
       haveAccountLogIn: 'Har du redan ett konto? Logga in',
@@ -499,7 +503,7 @@ const LanguageService = {
       shareLinkCreated: 'Länk skapad. Dela den endast med den du vill ska se lånet.',
       activeSharesForThisLoan: 'Aktiva länkar för detta lån',
       revokeShare: 'Återkalla',
-      editRequestBanner: 'Redigeringsåtkomst begärd för {name}.',
+      editRequestBanner: 'Redigeringsåtkomst begärd för {loanName} av {requester}.',
       editRequestApprovedBanner: 'Din begäran om redigeringsåtkomst för {name} godkändes.',
       editRequestDeclinedBanner: 'Din begäran om redigeringsåtkomst för {name} avslogs.',
       editRequestedByRecipient: 'Mottagaren har bett om redigeringsåtkomst.',
@@ -783,6 +787,8 @@ const LanguageService = {
       continueWithoutAccount: 'Continue without an account',
       signUpSuccess: 'Account created. Check your email to confirm.',
       signUpSubtitle: 'Enter your email and choose a password to save and sync your loans.',
+      displayNameOptional: 'Display name (optional)',
+      displayNameUsedForSharing: 'Shown when you share loans with others.',
       choosePassword: 'Choose a password',
       noAccountCreateOne: "Don't have an account? Create one",
       haveAccountLogIn: 'Already have an account? Log in',
@@ -820,7 +826,7 @@ const LanguageService = {
       shareLinkCreated: 'Link created. Share it only with the person who should see the loan.',
       activeSharesForThisLoan: 'Active links for this loan',
       revokeShare: 'Revoke',
-      editRequestBanner: 'Edit access requested for {name}.',
+      editRequestBanner: 'Edit access requested for {loanName} by {requester}.',
       editRequestApprovedBanner: 'Your edit access request for {name} was approved.',
       editRequestDeclinedBanner: 'Your edit access request for {name} was declined.',
       editRequestedByRecipient: 'Recipient requested edit access.',
@@ -2563,9 +2569,13 @@ const UIHandler = {
       return;
     }
     const loanName = (s) => (s.loan_snapshot && s.loan_snapshot.name) ? escapeHtml(s.loan_snapshot.name) : LanguageService.translate("loan");
+    const requesterLabel = (s) => {
+      const name = (s.recipient_display_name && s.recipient_display_name.trim()) ? s.recipient_display_name.trim() : (s.recipient_email && s.recipient_email.trim()) ? s.recipient_email.trim() : null;
+      return name ? escapeHtml(name) : LanguageService.translate("someone");
+    };
     banner.innerHTML = shares.map(s => `
       <div class="edit-request-item" data-share-id="${s.id}">
-        ${(LanguageService.translate("editRequestBanner") || "Edit access requested for {name}.").replace("{name}", loanName(s))}
+        ${(LanguageService.translate("editRequestBanner") || "Edit access requested for {loanName} by {requester}.").replace("{loanName}", loanName(s)).replace("{requester}", requesterLabel(s))}
         <div class="edit-request-actions">
           <button type="button" class="btn-primary edit-request-approve-btn" data-share-id="${s.id}">${LanguageService.translate("approve")}</button>
           <button type="button" class="btn-edit edit-request-decline-btn" data-share-id="${s.id}">${LanguageService.translate("decline")}</button>
@@ -2666,7 +2676,7 @@ const UIHandler = {
       const permLabel = s.permission === "edit" ? LanguageService.translate("shareCanEdit") : LanguageService.translate("shareViewOnly");
       const viewLabel = s.recipient_view === "lending" ? LanguageService.translate("shareLending") : LanguageService.translate("shareBorrowing");
       const recipientLine = s.used_at
-        ? " · " + LanguageService.translate("sharedWith") + ": " + escapeHtml((s.recipient_email || "").trim() || LanguageService.translate("signedInUser"))
+        ? " · " + LanguageService.translate("sharedWith") + ": " + escapeHtml(((s.recipient_display_name && s.recipient_display_name.trim()) || (s.recipient_email || "").trim() || LanguageService.translate("signedInUser")))
         : " · " + LanguageService.translate("linkNotUsedYet");
       const expiredLabel = expired ? " (" + LanguageService.translate("shareExpired") + ")" : "";
       const transferPending = s.transfer_requested_at ? " · " + LanguageService.translate("transferPending") : "";
@@ -4809,6 +4819,7 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
   feedback.textContent = "";
   feedback.className = "";
   const email = document.getElementById("signup-email").value.trim();
+  const displayName = document.getElementById("signup-display-name") && document.getElementById("signup-display-name").value.trim();
   const password = document.getElementById("signup-password").value;
   const confirm = document.getElementById("signup-password-confirm").value;
   if (!email || !password) {
@@ -4825,7 +4836,7 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
     feedback.className = "error";
     return;
   }
-  const result = await AuthService.signUp(email, password);
+  const result = await AuthService.signUp(email, password, displayName);
   if (result.success) {
     feedback.textContent = LanguageService.translate("signUpSuccess");
     feedback.className = "success";

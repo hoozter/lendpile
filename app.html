@@ -649,6 +649,11 @@
             <input type="email" id="signup-email" required placeholder="name@example.com" autocomplete="email">
           </div>
           <div class="login-form-group">
+            <label for="signup-display-name"><span data-translate="displayNameOptional">Display name (optional)</span></label>
+            <input type="text" id="signup-display-name" placeholder="" autocomplete="name" maxlength="200">
+            <p class="login-field-hint" data-translate="displayNameUsedForSharing">Shown when you share loans with others.</p>
+          </div>
+          <div class="login-form-group">
             <label for="signup-password" data-translate="choosePassword">Choose a password</label>
             <input type="password" id="signup-password" required minlength="8" placeholder="••••••••" autocomplete="new-password">
           </div>
