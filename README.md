@@ -1,5 +1,7 @@
 # Lendpile
 
+**Version 0.2.0**
+
 A clear, reliable loan and amortization tracker. Plan loans you borrow or lend, see schedules and charts, and optionally sign in with an account to keep your data in sync. By [hoozter](https://hoozter.com). Designed in Sweden. Free to use.
 
 ## What it does
@@ -52,7 +54,9 @@ Sign in to sync your data when you use the app on another browser or device. Cho
 | Path | Purpose |
 |------|--------|
 | `index.html` | Landing page (what Lendpile is, link to app). |
-| `app.html` | Main app (loans, amortization, sync, sharing, account, 2FA). |
+| `app.html` | Main app shell (markup only; loads `styles.css` and `app.js`). |
+| `app.js` | App logic: auth, sync, sharing, UI handlers, calculations, charts. |
+| `styles.css` | App styles (layout, modals, forms, dark/light theme). |
 | `privacy.html` | Privacy policy and disclaimer. |
 | `faq.html` | Help & FAQ (how to use the tool). |
 | `assets/` | Favicon, logo (`lendpile.svg`), and screenshot. |
@@ -62,7 +66,7 @@ Sign in to sync your data when you use the app on another browser or device. Cho
 | `docs/check-schema.sql` | Optional: check live DB schema. |
 | `PROJECT_OUTLINE.md` | Overview and roadmap. |
 
-- **CSS/JS:** In each HTML file. For deployment, the only “build” step is `node scripts/write-config.js` to generate `config.js` from env vars.
+- **No bundler:** The app uses plain HTML, CSS, and JS. `app.html` loads ECharts and Supabase from CDNs, then `config.js`, then `styles.css`, and finally `app.js` at the end of the body. The only build step for deployment is `node scripts/write-config.js` to generate `config.js` from env vars.
 - **Ignored:** `config.js` (secrets). Optional dev/review files (e.g. `docs/verify-*.js`, some `docs/*.md`) are in `.gitignore`; remove those lines if you want them in the repo.
 
 ## License
