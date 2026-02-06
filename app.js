@@ -3671,7 +3671,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   })();
   document.getElementById("update-available-refresh-btn")?.addEventListener("click", () => location.reload());
   const searchParams = new URLSearchParams(window.location.search);
-  window._pendingShareToken = searchParams.get("share") || null;
+  const shareFromUrl = searchParams.get("share") || null;
+  window._pendingShareToken = shareFromUrl;
+  if (shareFromUrl) sessionStorage.setItem("lendpile_pendingShareToken", shareFromUrl);
+  else window._pendingShareToken = sessionStorage.getItem("lendpile_pendingShareToken");
   const hash = window.location.hash.slice(1);
   if (hash) {
     const params = new URLSearchParams(hash);
@@ -4676,6 +4679,7 @@ async function tryRedeemPendingShare() {
   const result = await ShareService.redeemShare(window._pendingShareToken);
   const token = window._pendingShareToken;
   window._pendingShareToken = null;
+  sessionStorage.removeItem("lendpile_pendingShareToken");
   window.history.replaceState(null, "", window.location.pathname + (window.location.hash || ""));
   if (result.error) UIHandler.showFeedback(result.error);
   else if (result.share) {
