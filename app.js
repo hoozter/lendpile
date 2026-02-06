@@ -360,6 +360,8 @@ const LanguageService = {
       remainingDebt: 'Kvarvarande skuld',
       currentRate: 'Nuvarande ränta',
       interestCost: 'Räntekostnad',
+      accumulatedInterest: 'Ackumulerad ränta',
+      accumulatedAmortization: 'Ackumulerad amortering',
       monthsLeft: 'Mån kvar',
       interestChangedTo: 'Ränta ändrad till',
       increase: 'Ökning',
@@ -688,6 +690,8 @@ const LanguageService = {
       remainingDebt: 'Remaining Debt',
       currentRate: 'Current Interest Rate',
       interestCost: 'Interest Cost',
+      accumulatedInterest: 'Accumulated interest',
+      accumulatedAmortization: 'Accumulated amortization',
       monthsLeft: 'Months left',
       interestChangedTo: 'Interest changed to',
       increase: 'Increase',
@@ -3596,13 +3600,21 @@ const ChartHandler = {
           const point = timelineData[idx];
           if (!point) return '';
           const dateStr = UIHandler.formatDate(point.paymentDate);
-          const lines = [
+          const periodLines = [
             debtLabel + ': ' + UIHandler.formatCurrency(point.endingDebt, currency),
             LanguageService.translate('interestCost') + ': ' + UIHandler.formatCurrency(point.interest, currency),
             LanguageService.translate('amortization') + ': ' + UIHandler.formatCurrency(point.amortization, currency),
             LanguageService.translate('paymentLabel') + ': ' + UIHandler.formatCurrency(point.payment, currency)
           ];
-          return '<div class="chart-tooltip-date">' + dateStr + '</div>' + lines.join('<br/>');
+          const accumInterest = chartData.interest[idx];
+          const accumAmort = chartData.amort[idx];
+          const accumLines = [
+            LanguageService.translate('accumulatedInterest') + ': ' + UIHandler.formatCurrency(accumInterest, currency),
+            LanguageService.translate('accumulatedAmortization') + ': ' + UIHandler.formatCurrency(accumAmort, currency)
+          ];
+          return '<div class="chart-tooltip-date">' + dateStr + '</div>' +
+            periodLines.join('<br/>') +
+            '<br/><div class="chart-tooltip-accumulated">' + accumLines.join('<br/>') + '</div>';
         }
       },
       xAxis: {
