@@ -38,4 +38,5 @@ On the admin page, an admin can:
 ## Security
 
 - **Admin-by-role (recommended):** Use a Lendpile account with the admin role. If that account has **2FA** enabled in the app (Account → Two-factor authentication), you get password + 2FA to access the admin page. The Worker only checks your session and that your user has `app_metadata.role === 'admin'`.
-- **API key:** The ADMIN_SECRET is a single shared secret. Anyone with it can call the admin API. Keep it secret. Prefer logging in as an admin user with 2FA for day-to-day use.
+- **API key:** The ADMIN_SECRET is a single shared secret. Anyone with it can call the admin API. Keep it secret.
+- **Optional: TOTP for API key** – To require a second factor when using the API key (key + 6-digit code from an authenticator app), set **ADMIN_TOTP_SECRET** in the Worker’s Variables and Secrets to a **base32** TOTP secret. Generate one (e.g. run `openssl rand -base32 20` in a terminal, or use any TOTP app’s “enter key manually” and copy the secret). Add that secret to your authenticator app (Google Authenticator, Authy, etc.) and add the same value as the Worker secret `ADMIN_TOTP_SECRET`. On the admin page, when using “Or use API key”, enter the API key and the current 6-digit code. Without this secret set, only the API key is required; with it set, brute-forcing the key is not enough.

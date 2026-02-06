@@ -97,6 +97,7 @@ You use the URL you copied in Step 1.
 | **Worker** | `SUPABASE_ANON_KEY` | Supabase anon key |
 | **Worker** | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
 | **Worker** | `ADMIN_SECRET` | Your chosen long random secret |
+| **Worker** (optional) | `ADMIN_TOTP_SECRET` | Base32 TOTP secret – if set, API-key admin access also requires the current 6-digit code from your authenticator app (see [Admin users](ADMIN_USERS.md#security)) |
 | **Pages** (Environment variables) | `DELETE_ACCOUNT_URL` | Worker URL + `/delete-my-account` (e.g. `https://lendpile-api.xxxx.workers.dev/delete-my-account`) |
 
 The Worker URL is the one Cloudflare shows on the Worker’s page after you create it (Step 1).

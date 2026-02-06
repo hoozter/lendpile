@@ -82,9 +82,12 @@
   <hr class="divider" />
   <div class="admin-section">
     <h2>Or use API key</h2>
+    <p style="margin-bottom: 0.5rem; font-size: 0.9rem;">If you set ADMIN_TOTP_SECRET in the Worker, you must also enter the current 6-digit code from your authenticator app.</p>
     <div class="admin-form">
       <label for="admin-key">Admin API key</label>
       <input type="password" id="admin-key" placeholder="Your ADMIN_SECRET" autocomplete="off" />
+      <label for="admin-totp">TOTP code (6 digits)</label>
+      <input type="text" id="admin-totp" placeholder="000000" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
       <button type="button" id="admin-load-key">Load users</button>
     </div>
   </div>
@@ -110,6 +113,7 @@
     (function () {
       const STORAGE_KEY = "lendpile_admin_key";
       const keyInput = document.getElementById("admin-key");
+      const totpInput = document.getElementById("admin-totp");
       const loadKeyBtn = document.getElementById("admin-load-key");
       const loadJwtBtn = document.getElementById("admin-load-jwt");
       const logoutBtn = document.getElementById("admin-logout");
@@ -155,7 +159,12 @@
       function authHeaders() {
         if (!currentAuth) return {};
         if (currentAuth.type === "jwt") return { Authorization: "Bearer " + currentAuth.value };
-        return { "X-Admin-Key": currentAuth.value };
+        var h = { "X-Admin-Key": currentAuth.value };
+        if (totpInput && totpInput.value) {
+          var code = totpInput.value.replace(/\D/g, "").slice(0, 6);
+          if (code.length === 6) h["X-Admin-TOTP"] = code;
+        }
+        return h;
       }
 
       function setLoggedIn(email) {
