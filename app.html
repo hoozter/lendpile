@@ -340,6 +340,19 @@
     </div>
   </div>
 
+  <!-- GENERIC CONFIRM (replaces JS confirm() for revoke, transfer, disable 2FA, etc.) -->
+  <div id="generic-confirm-modal" class="confirm-modal modal">
+    <div class="modal-content">
+      <span class="btn-close">&times;</span>
+      <h2 class="modal-main-title" id="generic-confirm-title"></h2>
+      <p class="modal-message" id="generic-confirm-message"></p>
+      <div class="modal-actions">
+        <button id="generic-confirm-btn" class="btn-primary"></button>
+        <button id="generic-confirm-cancel-btn" class="btn-primary" data-translate="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- NEW VERSION AVAILABLE (prompt to refresh) -->
   <div id="update-available-modal" class="confirm-modal modal">
     <div class="modal-content">

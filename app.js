@@ -1553,6 +1553,7 @@ const UIHandler = {
         if (!modal) return;
         if (modal.id === "delete-confirmation-modal") ConfirmHandler.cancelDelete();
         else if (modal.id === "remove-shared-loan-modal") UIHandler.cancelRemoveSharedLoan();
+        else if (modal.id === "generic-confirm-modal") UIHandler.cancelGenericConfirm();
         else modal.style.display = "none";
       });
     });
@@ -1584,6 +1585,8 @@ const UIHandler = {
           ConfirmHandler.cancelDelete();
         } else if (modal.id === "remove-shared-loan-modal") {
           UIHandler.cancelRemoveSharedLoan();
+        } else if (modal.id === "generic-confirm-modal") {
+          UIHandler.cancelGenericConfirm();
         } else if (modal.id === "login-modal") {
           modal.style.display = "none";
           UIHandler.restoreBodyScroll();
@@ -2402,6 +2405,23 @@ const UIHandler = {
     document.getElementById(id).style.display = "none";
     this.restoreBodyScroll();
   },
+  /** Show HTML confirm modal (replaces window.confirm). Options: { title, message?, confirmLabel, confirmClass? ('btn-primary'|'btn-delete'), onConfirm: async () => {} } */
+  showConfirmModal(options) {
+    const { title, message = "", confirmLabel, confirmClass = "btn-primary", onConfirm } = options;
+    document.getElementById("generic-confirm-title").textContent = title;
+    const msgEl = document.getElementById("generic-confirm-message");
+    msgEl.textContent = message;
+    msgEl.style.display = message ? "block" : "none";
+    const btn = document.getElementById("generic-confirm-btn");
+    btn.textContent = confirmLabel;
+    btn.className = confirmClass;
+    window._genericConfirmOnConfirm = onConfirm;
+    this.showModal("generic-confirm-modal");
+  },
+  cancelGenericConfirm() {
+    window._genericConfirmOnConfirm = null;
+    this.closeModal("generic-confirm-modal");
+  },
   /** Show security prompt: 2FA-only when they have recovery but no 2FA (emphasize securing account); combined (2FA + recovery) when they have neither. Never show if they already have 2FA. "Maybe later" re-shows after 7 days. */
   async maybeShowSecurityPrompt() {
     if (localStorage.getItem("offlineMode")) return;
@@ -2729,24 +2749,38 @@ const UIHandler = {
       });
     });
     listEl.querySelectorAll(".share-revoke-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-share-id");
-        if (!id || !confirm(LanguageService.translate("revokeShare") + "?")) return;
-        const r = await ShareService.revokeShare(id);
-        if (r.error) UIHandler.showFeedback(r.error);
-        else UIHandler.populateShareActiveList();
+        if (!id) return;
+        UIHandler.showConfirmModal({
+          title: LanguageService.translate("revokeShare") + "?",
+          confirmLabel: LanguageService.translate("revokeShare"),
+          confirmClass: "btn-delete",
+          onConfirm: async () => {
+            const r = await ShareService.revokeShare(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else UIHandler.populateShareActiveList();
+          }
+        });
       });
     });
     listEl.querySelectorAll(".share-transfer-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-share-id");
-        if (!id || !confirm(LanguageService.translate("transferToRecipientConfirm"))) return;
-        const r = await ShareService.requestTransferToRecipient(id);
-        if (r.error) UIHandler.showFeedback(r.error);
-        else {
-          UIHandler.showFeedback(LanguageService.translate("transferRequested"));
-          UIHandler.populateShareActiveList();
-        }
+        if (!id) return;
+        UIHandler.showConfirmModal({
+          title: LanguageService.translate("transferToRecipientConfirm"),
+          confirmLabel: LanguageService.translate("transferToRecipient") || "Transfer",
+          confirmClass: "btn-primary",
+          onConfirm: async () => {
+            const r = await ShareService.requestTransferToRecipient(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else {
+              UIHandler.showFeedback(LanguageService.translate("transferRequested"));
+              UIHandler.populateShareActiveList();
+            }
+          }
+        });
       });
     });
     listEl.querySelectorAll(".share-cancel-transfer-btn").forEach(btn => {
@@ -3115,7 +3149,7 @@ const FormHandler = {
         if (changeType === "interest") {
           const loanStart = document.getElementById("loanStartDate").value;
           if (loanStart && date < loanStart) {
-            alert(LanguageService.translate("interestChangeBeforeLoanStart"));
+            UIHandler.showFeedback(LanguageService.translate("interestChangeBeforeLoanStart"));
             return;
           }
         }
@@ -4260,18 +4294,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     UIHandler.closeModal("mfa-enroll-modal");
   });
   /* Account section: disable 2FA */
-  document.getElementById("account-mfa-disable")?.addEventListener("click", async () => {
-    if (!confirm(LanguageService.translate("disable2FA") + "?")) return;
-    const factors = await AuthService.mfaListFactors();
-    const totp = factors.data && factors.data.totp && factors.data.totp[0];
-    if (!totp) return;
-    const { error } = await AuthService.mfaUnenroll(totp.id);
-    if (error) {
-      UIHandler.showFeedback(error.message || "Failed to disable 2FA.");
-      return;
-    }
-    await populateAccountSettings();
-    UIHandler.showFeedback(LanguageService.translate("settingsSaved"));
+  document.getElementById("account-mfa-disable")?.addEventListener("click", () => {
+    UIHandler.showConfirmModal({
+      title: LanguageService.translate("disable2FA") + "?",
+      confirmLabel: LanguageService.translate("disable2FA"),
+      confirmClass: "btn-delete",
+      onConfirm: async () => {
+        const factors = await AuthService.mfaListFactors();
+        const totp = factors.data && factors.data.totp && factors.data.totp[0];
+        if (!totp) return;
+        const { error } = await AuthService.mfaUnenroll(totp.id);
+        if (error) {
+          UIHandler.showFeedback(error.message || "Failed to disable 2FA.");
+          return;
+        }
+        await populateAccountSettings();
+        UIHandler.showFeedback(LanguageService.translate("settingsSaved"));
+      }
+    });
   });
 
   document.getElementById("loan-form-modal").addEventListener("submit", async e => {
@@ -4518,7 +4558,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("cancel-remove-shared-btn").addEventListener("click", () => {
     UIHandler.cancelRemoveSharedLoan();
   });
-  
+
+  document.getElementById("generic-confirm-btn").addEventListener("click", async () => {
+    const fn = window._genericConfirmOnConfirm;
+    if (typeof fn === "function") {
+      window._genericConfirmOnConfirm = null;
+      UIHandler.closeModal("generic-confirm-modal");
+      await fn();
+    }
+  });
+  document.getElementById("generic-confirm-cancel-btn").addEventListener("click", () => {
+    UIHandler.cancelGenericConfirm();
+  });
+
   document.getElementById("confirm-unlock-btn").addEventListener("click", () => {
     UIHandler.confirmUnlock();
   });
