@@ -458,7 +458,7 @@ const LanguageService = {
       password: 'Lösenord',
       login: 'Logga in',
       signUp: 'Skapa konto',
-      or: 'eller',
+      or: 'eller',git 
       continueWithoutAccount: 'Fortsätt utan konto',
       signUpSuccess: 'Kontot skapat. Kontrollera din e-post för bekräftelse.',
       signUpSubtitle: 'Ange din e-post och välj ett lösenord för att spara och synka dina lån.',
@@ -3790,7 +3790,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     UIHandler.init();
     await updateUserHeader();
     await updateOfflineBanner();
-    await tryRedeemPendingShare();
+    if (user) await tryRedeemPendingShare();
     if (window._emailJustVerified) {
       window._emailJustVerified = false;
       UIHandler.showFeedback(LanguageService.translate("emailVerifiedWelcome"));
