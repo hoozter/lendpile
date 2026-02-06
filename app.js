@@ -2943,7 +2943,8 @@ const FormHandler = {
   },
   openLoanModalForSharedLoan() {
     if (!UIHandler.currentShare || !UIHandler.currentShare.share) return;
-    const loan = UIHandler.currentShare.share.loan_snapshot;
+    const share = UIHandler.currentShare.share;
+    const loan = share.loan_snapshot;
     if (!loan) return;
     const modal = document.getElementById("loan-modal");
     const form = document.getElementById("loan-form-modal");
@@ -2965,9 +2966,10 @@ const FormHandler = {
     const borrowBtn = form.querySelector("#loan-type-borrow");
     const lendBtn = form.querySelector("#loan-type-lend");
     const loanTypeInput = form.querySelector("#loanType");
-    const loanType = loan.loanType === "lend" ? "lend" : "borrow";
-    if (borrowBtn) { borrowBtn.classList.toggle("active", loanType === "borrow"); lendBtn.classList.toggle("active", loanType === "lend"); }
-    if (loanTypeInput) loanTypeInput.value = loanType;
+    const recipientView = share.recipient_view || "borrowing";
+    const displayLoanType = recipientView === "lending" ? "lend" : "borrow";
+    if (borrowBtn) { borrowBtn.classList.toggle("active", displayLoanType === "borrow"); lendBtn.classList.toggle("active", displayLoanType === "lend"); }
+    if (loanTypeInput) loanTypeInput.value = displayLoanType;
     title.textContent = LanguageService.translate("editLoan");
     form.querySelector("#loanName").value = loan.name || "";
     form.querySelector("#loanStartDate").value = loan.startDate || "";
@@ -3054,9 +3056,10 @@ const FormHandler = {
     const borrowBtn = form.querySelector("#loan-type-borrow");
     const lendBtn = form.querySelector("#loan-type-lend");
     const loanTypeInput = form.querySelector("#loanType");
-    const loanType = loan.loanType === "lend" ? "lend" : "borrow";
-    if (borrowBtn) { borrowBtn.classList.toggle("active", loanType === "borrow"); lendBtn.classList.toggle("active", loanType === "lend"); borrowBtn.disabled = true; lendBtn.disabled = true; }
-    if (loanTypeInput) loanTypeInput.value = loanType;
+    const recipientView = share.recipient_view || "borrowing";
+    const displayLoanType = recipientView === "lending" ? "lend" : "borrow";
+    if (borrowBtn) { borrowBtn.classList.toggle("active", displayLoanType === "borrow"); lendBtn.classList.toggle("active", displayLoanType === "lend"); borrowBtn.disabled = true; lendBtn.disabled = true; }
+    if (loanTypeInput) loanTypeInput.value = displayLoanType;
     title.textContent = LanguageService.translate("editLoan");
     form.querySelector("#loanName").value = loan.name || "";
     form.querySelector("#loanStartDate").value = loan.startDate || "";
@@ -3289,9 +3292,10 @@ const FormHandler = {
     const sortedByDate = interestChangesCollected.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
     const firstRate = parseFloat(sortedByDate[0].rate);
     const interestRate = (isNaN(firstRate) ? 0 : Math.max(0, firstRate));
-    const loanType = (form.querySelector("#loanType") && form.querySelector("#loanType").value === "lend") ? "lend" : "borrow";
+    let loanType = (form.querySelector("#loanType") && form.querySelector("#loanType").value === "lend") ? "lend" : "borrow";
     if (isSharedEdit && UIHandler.currentShare && UIHandler.currentShare.share) {
       const snapshot = UIHandler.currentShare.share.loan_snapshot;
+      loanType = snapshot.loanType === "lend" ? "lend" : "borrow";
       const newLoan = {
         id: snapshot.id,
         loanType,
