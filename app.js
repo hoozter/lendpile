@@ -467,7 +467,7 @@ const LanguageService = {
       haveAccountLogIn: 'Har du redan ett konto? Logga in',
       offlineBannerText: 'Du använder appen utan konto. Data sparas bara på denna enhet. Logga in eller skapa konto för att spara och synka.',
       signInOrCreateAccount: 'Logga in eller skapa konto',
-      sharedLinkSignInRequired: 'För att öppna det delade lånet, logga in eller skapa ett konto ovan.',
+      sharedLinkSignInRequired: 'För att öppna det delade lånet, logga in eller skapa ett konto nedan.',
       enterEmailAndPassword: 'Ange e-post och lösenord.',
       passwordMinLength: 'Lösenordet måste vara minst 6 tecken.',
       linkExpiredOrInvalid: 'Bekräftelselänken har gått ut eller är ogiltig. Logga in nedan eller skapa ett nytt konto.',
@@ -788,7 +788,7 @@ const LanguageService = {
       haveAccountLogIn: 'Already have an account? Log in',
       offlineBannerText: "You're working without an account. Data is stored only on this device. Sign in or create an account to save your progress and sync across devices.",
       signInOrCreateAccount: 'Sign in or create account',
-      sharedLinkSignInRequired: 'To view this shared loan, sign in or create an account above.',
+      sharedLinkSignInRequired: 'To view this shared loan, sign in or create an account below.',
       enterEmailAndPassword: 'Please enter email and password.',
       passwordMinLength: 'Password must be at least 6 characters.',
       linkExpiredOrInvalid: 'Confirmation link expired or invalid. Sign in below or create a new account.',
@@ -1013,7 +1013,7 @@ function updateLoginPaneShareContext() {
   if (hasPendingShare && shareLandingVisible) {
     continueWrap.classList.add("hidden");
     requireMsg.classList.remove("hidden");
-    requireMsg.textContent = LanguageService.translate("sharedLinkSignInRequired") || "To view this shared loan, sign in or create an account above.";
+    requireMsg.textContent = LanguageService.translate("sharedLinkSignInRequired") || "To view this shared loan, sign in or create an account below.";
   } else {
     continueWrap.classList.remove("hidden");
     requireMsg.classList.add("hidden");
