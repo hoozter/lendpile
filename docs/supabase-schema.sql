@@ -71,6 +71,7 @@ create table if not exists public.loan_shares (
   expires_at timestamptz not null,
   used_at timestamptz,
   recipient_id uuid references auth.users(id) on delete set null,  -- recipient delete does not affect owner's loan_data
+  recipient_email text,  -- set when share is redeemed, so owner can see who accepted (used_at is only set on redeem, not on preview)
   transfer_requested_at timestamptz,  -- when set, owner has asked to give loan to recipient; recipient must accept or decline
   created_at timestamptz not null default now()
 );
@@ -120,6 +121,9 @@ create policy "Recipients can delete shares they received"
   on public.loan_shares for delete
   using (auth.uid() = recipient_id);
 
+-- Backfill: add recipient_email if missing (set when share is redeemed).
+do $$ begin alter table public.loan_shares add column if not exists recipient_email text; exception when others then null; end $$;
+
 -- Return share by token if valid (not expired; unused or already redeemed by this user).
 create or replace function public.get_share_by_token(share_token text)
 returns json
@@ -164,7 +168,8 @@ begin
 end;
 $$;
 
--- Redeem share: set recipient and used_at on first use, then return share.
+-- Redeem share: only when a signed-in user explicitly accepts. Sets recipient_id, recipient_email, used_at.
+-- The link stays valid (get_share_preview returns data) until either it is redeemed here or expires_at passes.
 create or replace function public.redeem_share(share_token text)
 returns json
 language plpgsql
@@ -174,6 +179,7 @@ as $$
 declare
   row record;
   uid uuid;
+  rec_email text;
 begin
   uid := auth.uid();
   if uid is null then
@@ -187,15 +193,17 @@ begin
     return null;
   end if;
   if row.used_at is null then
+    select email into rec_email from auth.users where id = uid limit 1;
     update public.loan_shares
-    set used_at = now(), recipient_id = uid
+    set used_at = now(), recipient_id = uid, recipient_email = rec_email
     where id = row.id;
   end if;
   return public.get_share_by_token(share_token);
 end;
 $$;
 
--- Share landing preview: public, no auth. Returns owner name and loan name for a valid token.
+-- Share landing preview: public, no auth. Read-only; does not set used_at.
+-- Link remains valid until someone signs in and redeems (redeem_share) or until expires_at.
 create or replace function public.get_share_preview(share_token text)
 returns json
 language plpgsql
