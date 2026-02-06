@@ -1,0 +1,10 @@
+# Cloudflare Worker for Lendpile: user account deletion + admin API
+# Deploy: from this directory run: npx wrangler deploy
+# Set secrets: npx wrangler secret put SUPABASE_URL
+#             npx wrangler secret put SUPABASE_ANON_KEY
+#             npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#             npx wrangler secret put ADMIN_SECRET
+
+name = "lendpile-api"
+main = "src/index.js"
+compatibility_date = "2024-01-01"

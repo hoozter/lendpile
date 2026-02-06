@@ -445,11 +445,15 @@
       <span class="btn-close">&times;</span>
       <h2 class="modal-main-title" data-translate="deleteAccount">Ta bort konto</h2>
       <p class="delete-account-warning" data-translate="deleteAccountWarning">All din data (lån, inställningar och konto) raderas permanent och kan inte återställas. Detta går inte att ångra.</p>
-      <p class="delete-account-confirm" data-translate="deleteAccountConfirm">Skriv in ditt lösenord nedan för att bekräfta att du vill ta bort ditt konto.</p>
+      <p class="delete-account-confirm" data-translate="deleteAccountConfirm">Skriv in ditt lösenord och skriv DELETE i rutan nedan för att bekräfta.</p>
       <form id="delete-account-form">
         <div class="login-form-group">
           <label for="delete-account-password" data-translate="password">Lösenord</label>
           <input type="password" id="delete-account-password" required autocomplete="current-password">
+        </div>
+        <div class="login-form-group">
+          <label for="delete-account-type-delete" data-translate="deleteAccountTypeDelete">Skriv DELETE för att bekräfta</label>
+          <input type="text" id="delete-account-type-delete" required autocomplete="off" placeholder="DELETE">
         </div>
         <div class="modal-actions">
           <button type="submit" class="btn-delete" id="delete-account-submit" data-translate="deleteMyAccount">Ta bort mitt konto</button>

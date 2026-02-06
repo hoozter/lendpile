@@ -593,9 +593,10 @@ const LanguageService = {
       dataExported: 'Data exporterad.',
       deleteAccount: 'Ta bort konto',
       deleteAccountWarning: 'All din data (lån, inställningar och konto) raderas permanent och kan inte återställas. Detta går inte att ångra.',
-      deleteAccountConfirm: 'Skriv in ditt lösenord nedan för att bekräfta att du vill ta bort ditt konto.',
+      deleteAccountConfirm: 'Skriv in ditt lösenord och skriv DELETE i rutan nedan för att bekräfta.',
+      deleteAccountTypeDelete: 'Skriv DELETE för att bekräfta',
       deleteMyAccount: 'Ta bort mitt konto',
-      deleteAccountUnavailable: 'Kontoradering är inte tillgänglig här. Kontakta support för att ta bort ditt konto.',
+      deleteAccountUnavailable: 'Kontoradering är inte tillgänglig. Om du använder Supabase Edge Function eller egen backend, kontrollera att den är utplacerad och att URL:en stämmer. Annars kan du ta bort användaren i Supabase Dashboard → Authentication → Users.',
       setDefaultFirst: 'Sätt en annan e‑post som standard först.',
       displayName: 'Visningsnamn',
       displayNameHelp: 'Används t.ex. när du delar ett lån: "David delar ett lån".',
@@ -918,9 +919,10 @@ const LanguageService = {
       dataExported: 'Data exported.',
       deleteAccount: 'Delete account',
       deleteAccountWarning: 'All your data (loans, settings, and account) will be permanently deleted and cannot be recovered. This cannot be undone.',
-      deleteAccountConfirm: 'Enter your password below to confirm you want to delete your account.',
+      deleteAccountConfirm: 'Enter your password and type DELETE in the box below to confirm.',
+      deleteAccountTypeDelete: 'Type DELETE to confirm',
       deleteMyAccount: 'Delete my account',
-      deleteAccountUnavailable: 'Account deletion is not available from this app. Please contact support to delete your account.',
+      deleteAccountUnavailable: 'Account deletion is unavailable. If you use the Supabase Edge Function or a custom backend, ensure it is deployed and the URL is correct. Otherwise delete the user in Supabase Dashboard → Authentication → Users.',
       setDefaultFirst: 'Set another email as default first.',
       displayName: 'Display name',
       displayNameHelp: 'Shown when you share a loan, e.g. "David is sharing a loan".',
@@ -4177,8 +4179,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     const feedback = document.getElementById("delete-account-feedback");
     const password = document.getElementById("delete-account-password")?.value;
+    const typeDelete = document.getElementById("delete-account-type-delete")?.value?.trim() || "";
     feedback.textContent = "";
     feedback.className = "";
+    if (typeDelete !== "DELETE") {
+      feedback.textContent = LanguageService.translate("deleteAccountTypeDelete");
+      feedback.className = "error";
+      return;
+    }
     const user = await AuthService.getUser();
     if (!user?.email) {
       feedback.textContent = LanguageService.translate("currentPasswordIncorrect");
@@ -4196,19 +4204,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       feedback.className = "error";
       return;
     }
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) {
+      feedback.textContent = LanguageService.translate("deleteAccountUnavailable");
+      feedback.className = "error";
+      return;
+    }
+    const deleteAccountUrl = window.DELETE_ACCOUNT_URL || (SUPABASE_URL && `${SUPABASE_URL}/functions/v1/delete-my-account`);
+    if (!deleteAccountUrl) {
+      feedback.textContent = LanguageService.translate("deleteAccountUnavailable");
+      feedback.className = "error";
+      return;
+    }
     let deleteError = null;
     try {
-      if (typeof supabaseClient.auth.deleteUser === "function") {
-        const res = await supabaseClient.auth.deleteUser();
-        deleteError = res?.error ?? null;
-      } else {
-        deleteError = { message: LanguageService.translate("deleteAccountUnavailable") };
+      const res = await fetch(deleteAccountUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        deleteError = { message: (body && body.error) || body || LanguageService.translate("deleteAccountUnavailable") };
       }
     } catch (err) {
       deleteError = { message: err.message || LanguageService.translate("deleteAccountUnavailable") };
     }
     if (deleteError) {
-      feedback.textContent = deleteError.message;
+      feedback.textContent = typeof deleteError.message === "string" ? deleteError.message : LanguageService.translate("deleteAccountUnavailable");
       feedback.className = "error";
       return;
     }

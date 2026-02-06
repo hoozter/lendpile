@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Admin – Lendpile</title>
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --text: #333;
+      --border: #e0e0e0;
+      --error: #c00;
+      --btn-bg: #00A1FF;
+      --btn-del: #c00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --text: #f0f0f0;
+        --border: #444;
+        --btn-bg: #1a7fd4;
+        --btn-del: #e55;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 24px; max-width: 900px; margin: 0 auto; min-height: 100vh; }
+    h1 { font-size: 1.35rem; margin-bottom: 1rem; }
+    .back { display: inline-block; margin-bottom: 1rem; color: var(--btn-bg); text-decoration: none; }
+    .back:hover { text-decoration: underline; }
+    .admin-form { margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .admin-form label { font-weight: 500; }
+    .admin-form input[type="password"] { padding: 8px 12px; min-width: 200px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+    .admin-form button { padding: 8px 16px; border: none; border-radius: 6px; background: var(--btn-bg); color: #fff; cursor: pointer; font-weight: 500; }
+    .admin-form button:hover { opacity: 0.9; }
+    .admin-form button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .message { margin-bottom: 1rem; padding: 10px 12px; border-radius: 6px; }
+    .message.error { background: rgba(200,0,0,0.15); color: var(--error); }
+    .message.success { background: rgba(0,160,0,0.15); }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { font-weight: 600; }
+    .btn-del { padding: 6px 12px; border: none; border-radius: 4px; background: var(--btn-del); color: #fff; cursor: pointer; font-size: 13px; }
+    .btn-del:hover { opacity: 0.9; }
+    .btn-del:disabled { opacity: 0.5; cursor: not-allowed; }
+    .meta { font-size: 12px; color: var(--text); opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <a class="back" href="app.html">← Back to Lendpile</a>
+  <h1>Admin – Users</h1>
+  <p style="margin-bottom: 1rem;">Manage users via the Lendpile API Worker. Set <code>ADMIN_API_URL</code> or <code>DELETE_ACCOUNT_URL</code> in config and deploy the Worker with an <code>ADMIN_SECRET</code>.</p>
+
+  <div class="admin-form">
+    <label for="admin-key">Admin API key</label>
+    <input type="password" id="admin-key" placeholder="Your ADMIN_SECRET" autocomplete="off" />
+    <button type="button" id="admin-load">Load users</button>
+  </div>
+  <div id="admin-message" class="message" style="display: none;"></div>
+  <div id="admin-table-wrap" style="display: none;">
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>User ID</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="admin-tbody"></tbody>
+    </table>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    (function () {
+      const STORAGE_KEY = "lendpile_admin_key";
+      const keyInput = document.getElementById("admin-key");
+      const loadBtn = document.getElementById("admin-load");
+      const msgEl = document.getElementById("admin-message");
+      const tableWrap = document.getElementById("admin-table-wrap");
+      const tbody = document.getElementById("admin-tbody");
+
+      try {
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (stored) keyInput.value = stored;
+      } catch (_) {}
+
+      function getBaseUrl() {
+        const adminUrl = window.ADMIN_API_URL;
+        if (adminUrl) return adminUrl.replace(/\/$/, "");
+        const deleteUrl = window.DELETE_ACCOUNT_URL;
+        if (deleteUrl) return deleteUrl.replace(/\/delete-my-account\/?$/, "");
+        return "";
+      }
+
+      function showMessage(text, isError) {
+        msgEl.textContent = text;
+        msgEl.className = "message " + (isError ? "error" : "success");
+        msgEl.style.display = "block";
+      }
+
+      function hideMessage() {
+        msgEl.style.display = "none";
+      }
+
+      loadBtn.addEventListener("click", async function () {
+        const key = keyInput.value.trim();
+        if (!key) {
+          showMessage("Enter the Admin API key.", true);
+          return;
+        }
+        try {
+          sessionStorage.setItem(STORAGE_KEY, key);
+        } catch (_) {}
+        const base = getBaseUrl();
+        if (!base) {
+          showMessage("Set ADMIN_API_URL or DELETE_ACCOUNT_URL in config.js to the Worker base URL.", true);
+          return;
+        }
+        loadBtn.disabled = true;
+        hideMessage();
+        try {
+          const res = await fetch(base + "/admin/users", {
+            headers: { "X-Admin-Key": key },
+          });
+          const data = await res.json().catch(function () { return {}; });
+          if (!res.ok) {
+            showMessage(data.error || "Failed to load users (" + res.status + ").", true);
+            tableWrap.style.display = "none";
+            return;
+          }
+          const users = data.users || [];
+          tbody.innerHTML = "";
+          users.forEach(function (u) {
+            const tr = document.createElement("tr");
+            const email = (u.email || "").trim() || "—";
+            const id = (u.id || "").trim() || "—";
+            const created = u.created_at ? new Date(u.created_at).toLocaleString() : "—";
+            tr.innerHTML =
+              "<td>" + escapeHtml(email) + "</td>" +
+              "<td class=\"meta\">" + escapeHtml(id) + "</td>" +
+              "<td class=\"meta\">" + escapeHtml(created) + "</td>" +
+              "<td><button type=\"button\" class=\"btn-del\" data-id=\"" + escapeHtml(id) + "\">Delete</button></td>";
+            tr.querySelector(".btn-del").addEventListener("click", function () {
+              deleteUser(id, key, base, tr);
+            });
+            tbody.appendChild(tr);
+          });
+          tableWrap.style.display = "block";
+          showMessage("Loaded " + users.length + " user(s).", false);
+        } catch (err) {
+          showMessage(err.message || "Network error.", true);
+          tableWrap.style.display = "none";
+        } finally {
+          loadBtn.disabled = false;
+        }
+      });
+
+      function escapeHtml(str) {
+        if (str == null) return "";
+        var s = String(str);
+        return s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function deleteUser(userId, key, base, rowEl) {
+        if (!confirm("Permanently delete this user? This cannot be undone.")) return;
+        var btn = rowEl.querySelector(".btn-del");
+        btn.disabled = true;
+        fetch(base + "/admin/users/" + encodeURIComponent(userId), {
+          method: "DELETE",
+          headers: { "X-Admin-Key": key },
+        })
+          .then(function (res) {
+            return res.json().then(function (data) { return { res: res, data: data }; });
+          })
+          .then(function (r) {
+            if (r.res.ok) {
+              rowEl.remove();
+              showMessage("User deleted.", false);
+            } else {
+              showMessage(r.data.error || "Delete failed.", true);
+              btn.disabled = false;
+            }
+          })
+          .catch(function (err) {
+            showMessage(err.message || "Network error.", true);
+            btn.disabled = false;
+          });
+      }
+    })();
+  </script>
+</body>
+</html>
