@@ -225,6 +225,8 @@ begin
   );
 end;
 $$;
+-- Allow unauthenticated callers (share link opened without logging in) to fetch preview.
+grant execute on function public.get_share_preview(text) to anon;
 
 -- Update owner's loan when recipient (with edit permission) saves.
 create or replace function public.update_shared_loan(share_token text, loan_json jsonb)
