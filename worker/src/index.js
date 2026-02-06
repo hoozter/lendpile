@@ -3,6 +3,7 @@
  * - POST /delete-my-account: user deletes own account (Bearer user JWT)
  * - GET /admin/users, DELETE /admin/users/:id: admin only.
  *   Admin auth: (1) X-Admin-Key (+ optional X-Admin-TOTP when ADMIN_TOTP_SECRET set), or (2) Bearer <user JWT> with app_metadata.role === 'admin'
+ *   TOTP secret must be base32 (RFC 4648).
  */
 
 const CORS = {
@@ -58,7 +59,7 @@ async function totpGenerate(secretBytes, counter) {
   return code % 1000000;
 }
 
-/** Verify 6-digit TOTP code; allow ±1 time step for clock skew. */
+/** Verify 6-digit TOTP code (secret must be base32). Allow ±1 time step for clock skew. */
 async function verifyTotp(secretBase32, codeStr) {
   const code = parseInt(String(codeStr).replace(/\D/g, "").slice(0, 6), 10);
   if (isNaN(code) || code < 0 || code > 999999) return false;
@@ -77,7 +78,7 @@ async function verifyTotp(secretBase32, codeStr) {
   return false;
 }
 
-/** Check API key auth. If ADMIN_TOTP_SECRET is set, also require valid X-Admin-TOTP. */
+/** Check API key auth. If ADMIN_TOTP_SECRET is set, also require valid X-Admin-TOTP (base32 secret). */
 async function adminAuthBySecret(req, env) {
   const secret = env.ADMIN_SECRET;
   if (!secret) return false;
