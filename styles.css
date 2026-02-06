@@ -1312,13 +1312,6 @@ th, td {
 #login-modal .login-share-invalid-text {
   color: var(--error-color, #c0392b);
 }
-#login-modal .login-share-require-auth-msg {
-  margin: 14px 0 0;
-  font-size: 14px;
-  color: var(--text-color);
-  opacity: 0.9;
-}
-#login-modal .login-share-require-auth-msg.hidden { display: none; }
 #login-modal .login-continue-without-wrap.hidden { display: none; }
 #login-modal .login-form-group {
   margin-bottom: 18px;
