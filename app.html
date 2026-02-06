@@ -4285,6 +4285,7 @@
           </div>
         `;
       },
+      /** Card click to open loan; three-dot menu is handled by delegated listener on .container. */
       bindCompactCardMenus() {
         const merged = this._mergedLoansList || [];
         document.querySelectorAll(".loan-card-compact").forEach(card => {
@@ -4302,46 +4303,6 @@
                 UIHandler.showLoanDetail(item != null && item._myIndex !== undefined ? item._myIndex : index);
               }
             }
-          });
-        });
-        document.querySelectorAll(".loan-detail-menu-btn").forEach(btn => {
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const wrap = btn.closest(".loan-detail-menu-wrap");
-            const menu = wrap.querySelector(".loan-detail-menu");
-            const isOpen = menu.classList.toggle("open");
-            btn.setAttribute("aria-expanded", isOpen);
-          });
-        });
-        document.querySelectorAll(".loan-detail-menu [data-action]").forEach(btn => {
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const menu = btn.closest(".loan-detail-menu");
-            if (menu) menu.classList.remove("open");
-            const action = btn.getAttribute("data-action");
-            const cardIndex = parseInt(btn.getAttribute("data-loan-index"), 10);
-            const item = merged[cardIndex];
-            if (item && item._shared) {
-              if (action === "edit") {
-                UIHandler.currentShare = item._shared;
-                if (item._shared.share?.permission === "view") FormHandler.openLoanModalForSharedViewOnly();
-                else FormHandler.openLoanModalForSharedLoan();
-                return;
-              }
-              if (action === "duplicate") {
-                UIHandler.currentShare = item._shared;
-                UIHandler.duplicateSharedLoanToMyList();
-                return;
-              }
-              if (action === "remove-shared") {
-                UIHandler.showRemoveSharedLoanModal(item._shared);
-                return;
-              }
-            }
-            const myIndex = item && item._myIndex !== undefined ? item._myIndex : cardIndex;
-            if (action === "edit") FormHandler.openLoanModal(myIndex);
-            else if (action === "duplicate") FormHandler.duplicateLoan(myIndex).then(() => { UIHandler.showLoanList(); });
-            else if (action === "delete") ConfirmHandler.confirmDelete("loan", myIndex);
           });
         });
       },
@@ -6327,8 +6288,7 @@
           document.body.style.overflow = "hidden";
           loginModal.style.display = "flex";
           showLoginPane();
-          return;
-        }
+        } else {
         const aal = await AuthService.getAuthenticatorAssuranceLevel();
         if (aal.nextLevel === "aal2" && aal.nextLevel !== aal.currentLevel) {
           needMfaChallenge = true;
@@ -6354,18 +6314,6 @@
           const syncedData = await SyncService.loadData();
           StorageService.save("loanData", syncedData ?? []);
         }
-      }
-      async function tryRedeemPendingShare() {
-        if (!window._pendingShareToken) return;
-        const result = await ShareService.redeemShare(window._pendingShareToken);
-        const token = window._pendingShareToken;
-        window._pendingShareToken = null;
-        window.history.replaceState(null, "", window.location.pathname + (window.location.hash || ""));
-        if (result.error) UIHandler.showFeedback(result.error);
-        else if (result.share) {
-          UIHandler.sharesReceived = [{ ...result.share, token }, ...(UIHandler.sharesReceived || [])];
-          UIHandler.currentShare = { token, share: result.share };
-          UIHandler.showSharedLoan();
         }
       }
       if (!needMfaChallenge) {
@@ -6992,6 +6940,44 @@
           else if (index != null && action === "delete") ConfirmHandler.confirmDelete("loan", index);
           return;
         }
+        const loanCardMenuBtn = e.target.closest(".loan-detail-menu-btn");
+        if (loanCardMenuBtn) {
+          e.stopPropagation();
+          const wrap = loanCardMenuBtn.closest(".loan-detail-menu-wrap");
+          const menu = wrap && wrap.querySelector(".loan-detail-menu");
+          document.querySelectorAll(".loan-detail-menu.open").forEach(m => m.classList.remove("open"));
+          if (menu) menu.classList.toggle("open");
+          loanCardMenuBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
+          return;
+        }
+        const loanCardMenuItem = e.target.closest(".loan-detail-menu [data-action]");
+        if (loanCardMenuItem) {
+          e.stopPropagation();
+          const menu = loanCardMenuItem.closest(".loan-detail-menu");
+          if (menu) menu.classList.remove("open");
+          const cardIndex = parseInt(loanCardMenuItem.getAttribute("data-loan-index"), 10);
+          const merged = UIHandler._mergedLoansList || [];
+          const item = merged[cardIndex];
+          const action = loanCardMenuItem.getAttribute("data-action");
+          if (item && item._shared) {
+            if (action === "edit") {
+              UIHandler.currentShare = item._shared;
+              if (item._shared.share?.permission === "view") FormHandler.openLoanModalForSharedViewOnly();
+              else FormHandler.openLoanModalForSharedLoan();
+            } else if (action === "duplicate") {
+              UIHandler.currentShare = item._shared;
+              UIHandler.duplicateSharedLoanToMyList();
+            } else if (action === "remove-shared") {
+              UIHandler.showRemoveSharedLoanModal(item._shared);
+            }
+          } else {
+            const myIndex = item && item._myIndex !== undefined ? item._myIndex : cardIndex;
+            if (action === "edit") FormHandler.openLoanModal(myIndex);
+            else if (action === "duplicate") FormHandler.duplicateLoan(myIndex).then(() => { UIHandler.showLoanList(); });
+            else if (action === "delete") ConfirmHandler.confirmDelete("loan", myIndex);
+          }
+          return;
+        }
         const paymentPlanBtn = e.target.closest(".payment-plan-menu-btn");
         if (paymentPlanBtn) {
           e.stopPropagation();
@@ -7226,6 +7212,19 @@
     /********************************************************
      * LOGIN / SIGNUP EVENT HANDLERS
      ********************************************************/
+    async function tryRedeemPendingShare() {
+      if (!window._pendingShareToken) return;
+      const result = await ShareService.redeemShare(window._pendingShareToken);
+      const token = window._pendingShareToken;
+      window._pendingShareToken = null;
+      window.history.replaceState(null, "", window.location.pathname + (window.location.hash || ""));
+      if (result.error) UIHandler.showFeedback(result.error);
+      else if (result.share) {
+        UIHandler.sharesReceived = [{ ...result.share, token }, ...(UIHandler.sharesReceived || [])];
+        UIHandler.currentShare = { token, share: result.share };
+        UIHandler.showSharedLoan();
+      }
+    }
     async function onLoginSuccess() {
       document.getElementById("login-modal").style.display = "none";
       UIHandler.restoreBodyScroll();
