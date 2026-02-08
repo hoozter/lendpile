@@ -402,6 +402,7 @@
       <h2 class="modal-main-title" data-translate="account">Konto</h2>
       <div class="modal-section" id="account-settings-section">
         <h4 class="account-subtitle" data-translate="email">E‑post</h4>
+        <p class="account-field-help account-email-section-intro" data-translate="emailSectionIntro">Primary email is used for sign-in and account-critical messages. Recovery email is used only if you lose access to your primary, and for security alerts. Both must be verified.</p>
         <div id="account-email-list" class="account-email-list"></div>
         <div class="account-email-add-wrap hidden" id="account-email-add-wrap">
           <input type="email" id="account-new-secondary-email" placeholder="" autocomplete="email">
@@ -410,7 +411,7 @@
             <button type="button" class="btn-secondary account-cancel-add-email" data-translate="cancel">Avbryt</button>
           </div>
         </div>
-        <button type="button" class="btn-secondary account-add-email-link" id="account-add-email-link" data-translate="addAnotherEmail">Lägg till annan e‑post</button>
+        <button type="button" class="btn-secondary account-add-email-link" id="account-add-email-link" data-translate="addRecoveryEmail">Add recovery email</button>
         <div class="account-change-email-inline hidden" id="account-change-email-inline">
           <input type="email" id="account-new-email" placeholder="" autocomplete="email">
           <div class="account-email-actions">
@@ -563,8 +564,8 @@
   
   <!-- FEEDBACK MODAL -->
   <div id="feedback-modal" class="modal">
-    <div class="modal-content feedback-content">
-      <div class="feedback-message">
+    <div class="modal-content">
+      <div>
         <i class="material-icons">check_circle</i>
         <p data-translate="settingsSaved">Inställningarna har sparats!</p>
       </div>
@@ -654,6 +655,9 @@
           <div class="login-form-group">
             <label for="login-password" data-translate="password">Password</label>
             <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
+            <p class="login-forgot-wrap">
+              <button type="button" class="login-forgot-link" id="login-forgot-password-btn" data-translate="forgotPassword">Forgot password?</button>
+            </p>
           </div>
           <div class="login-actions">
             <button type="submit" class="btn-primary" data-translate="login">Log in</button>
@@ -668,6 +672,25 @@
             </p>
           </div>
         </form>
+      </div>
+      <div id="forgot-password-pane" class="forgot-password-pane hidden">
+        <div class="login-header">
+          <h2 data-translate="forgotPasswordTitle">Forgot password?</h2>
+          <p data-translate="forgotPasswordIntro">Enter your email and we’ll send a reset link.</p>
+        </div>
+        <form id="forgot-password-form">
+          <div class="login-form-group">
+            <label for="forgot-password-email" data-translate="email">Email</label>
+            <input type="email" id="forgot-password-email" required placeholder="name@example.com" autocomplete="email">
+          </div>
+          <div class="login-actions">
+            <button type="submit" class="btn-primary" data-translate="sendResetLink">Send reset link</button>
+            <p class="login-switch-wrap">
+              <button type="button" class="login-switch-link" id="forgot-to-login-link" data-translate="backToLogin">Back to login</button>
+            </p>
+          </div>
+        </form>
+        <div id="forgot-password-feedback" class="login-feedback-common"></div>
       </div>
       <div id="signup-pane" class="signup-pane hidden">
         <div class="login-header">
@@ -701,6 +724,25 @@
           </div>
         </form>
       </div>
+      <div id="recovery-set-password-pane" class="recovery-set-password-pane hidden">
+        <div class="login-header">
+          <h2 data-translate="setNewPasswordTitle">Set your new password</h2>
+        </div>
+        <form id="recovery-set-password-form">
+          <div class="login-form-group">
+            <label for="recovery-new-password" data-translate="newPassword">New password</label>
+            <input type="password" id="recovery-new-password" required minlength="8" autocomplete="new-password">
+          </div>
+          <div class="login-form-group">
+            <label for="recovery-confirm-password" data-translate="confirmPassword">Confirm new password</label>
+            <input type="password" id="recovery-confirm-password" required minlength="8" autocomplete="new-password">
+          </div>
+          <div class="login-actions">
+            <button type="submit" class="btn-primary" data-translate="setNewPassword">Set new password</button>
+          </div>
+        </form>
+        <div id="recovery-set-password-feedback" class="login-feedback-common"></div>
+      </div>
       <div id="login-feedback" class="login-feedback-common"></div>
     </div>
   </div>
@@ -733,11 +775,11 @@
     </div>
   </div>
   
-  <!-- MFA ENROLL MODAL (Settings: enable 2FA) -->
+  <!-- MFA ENROLL MODAL – Authenticator app (QR + key + verify) -->
   <div id="mfa-enroll-modal" class="modal">
     <div class="modal-content">
       <span class="btn-close">&times;</span>
-      <h2 data-translate="enable2FA">Enable 2FA</h2>
+      <h2 data-translate="mfaAuthenticatorSetup">Authenticator app setup</h2>
       <p data-translate="mfaEnrollSteps">Scan the QR code with your authenticator app, then enter the 6‑digit code below.</p>
       <div id="mfa-enroll-qr" class="mfa-qr-container"></div>
       <div class="mfa-secret-wrap hidden" id="mfa-secret-wrap">
@@ -752,13 +794,13 @@
         <input type="text" id="mfa-enroll-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" autocomplete="one-time-code">
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-primary" id="mfa-enroll-verify" data-translate="enable2FA">Enable 2FA</button>
+        <button type="button" class="btn-primary" id="mfa-enroll-verify" data-translate="verify">Verify</button>
         <button type="button" class="btn-primary" id="mfa-enroll-cancel" data-translate="cancel">Cancel</button>
       </div>
       <div id="mfa-enroll-feedback" class="mfa-feedback"></div>
     </div>
   </div>
-  
+
   <!-- MFA CHALLENGE MODAL (Login: enter code) -->
   <div id="mfa-challenge-modal" class="modal">
     <div class="modal-content">

@@ -82,6 +82,12 @@ const AuthService = {
     if (!supabaseClient) return { error: { message: 'Not configured' } };
     return await supabaseClient.auth.mfa.unenroll({ factorId });
   },
+  async resetPasswordForEmail(email, redirectTo) {
+    if (!supabaseClient) return { error: "Supabase not configured." };
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) return { error: error.message };
+    return {};
+  },
   onAuthStateChanged(callback) {
     if (supabaseClient) supabaseClient.auth.onAuthStateChange((event, session) => callback(event, session));
   }
@@ -596,10 +602,27 @@ const LanguageService = {
       changeEmail: 'Ändra e‑post',
       sendVerification: 'Skicka verifiering',
       emailChangeSent: 'Verifieringslänk skickad till den nya e‑posten. E‑posten uppdateras när du bekräftar.',
-      setAsPrimary: 'Sätt som inloggning',
+      setAsPrimary: 'Sätt som primär',
       setAsDefault: 'Sätt som standard',
       default: 'Standard',
+      primaryEmailBadge: 'Primär (används för inloggning)',
+      recoveryEmailBadge: 'Återställning',
+      emailSectionPrimaryHelp: 'Används för inloggning och viktiga kontomeddelanden. Måste verifieras.',
+      emailSectionRecoveryHelp: 'Används endast om du tappar åtkomst till din primära e‑post, och för säkerhetsaviseringar. Måste verifieras.',
+      emailSectionIntro: 'Primär e‑post används för inloggning och viktiga kontomeddelanden. Återställnings‑e‑post används endast om du tappar åtkomst till den primära, och för säkerhetsaviseringar. Båda måste verifieras.',
       addAnotherEmail: 'Lägg till annan e‑post',
+      addRecoveryEmail: 'Lägg till återställnings‑e‑post',
+      emailRecoveryHelp: 'Länkar för att återställa lösenord skickas till din huvude‑post. Lägg till en återställnings‑e‑post så att vi har ett annat sätt att nå dig om du tappar åtkomsten.',
+      forgotPassword: 'Glömt lösenord?',
+      forgotPasswordTitle: 'Glömt lösenord?',
+      forgotPasswordIntro: 'Ange din e‑post så skickar vi en återställningslänk.',
+      backToLogin: 'Tillbaka till inloggning',
+      enterEmail: 'Ange din e‑post.',
+      sendResetLink: 'Skicka återställningslänk',
+      resetLinkSent: 'Kolla din e‑post efter en återställningslänk. Den skickades till din huvude‑postadress.',
+      setNewPassword: 'Ange nytt lösenord',
+      setNewPasswordTitle: 'Ange ditt nya lösenord',
+      setNewPasswordSuccess: 'Lösenordet är uppdaterat. Du kan nu logga in.',
       security: 'Säkerhet',
       dataAndPrivacy: 'Data och konto',
       exportAllData: 'Exportera all data',
@@ -616,7 +639,7 @@ const LanguageService = {
       recoveryEmail: 'Återställnings‑/reserve‑e‑post',
       recoveryEmailHelp: 'Valfri. Du kan sätta den som inloggnings‑e‑post efter att du sparat; en verifieringslänk skickas.',
       twoFactorAuth: 'Tvåfaktorsautentisering (2FA)',
-      twoFactorHelp: 'Skanna QR‑koden med en autentiseringsapp (t.ex. Google Authenticator) för extra säkerhet.',
+      twoFactorHelp: 'Aktivera 2FA för extra säkerhet. Använd en autentiseringsapp.',
       twoFactorOnStatus: '2FA är på. Du kan inaktivera det nedan.',
       enable2FA: 'Aktivera 2FA',
       disable2FA: 'Inaktivera 2FA',
@@ -626,7 +649,11 @@ const LanguageService = {
       copied: 'Kopierad',
       mfaChallengePrompt: 'Ange den 6‑siffriga koden från din autentiseringsapp.',
       verificationCode: 'Verifieringskod',
-      verify: 'Verifiera'
+      verify: 'Verifiera',
+      mfaChooseMethodIntro: 'Välj hur du vill verifiera din identitet när du loggar in.',
+      mfaMethodAuthenticator: 'Autentiseringsapp',
+      mfaMethodAuthenticatorDesc: 'Använd en app som Google Authenticator. Skanna en QR-kod eller ange en nyckel om du inte kan skanna.',
+      mfaAuthenticatorSetup: 'Konfigurera autentiseringsapp'
     },
     en: {
       myLoans: 'My Loans',
@@ -937,9 +964,30 @@ const LanguageService = {
       add: 'Add',
       account: 'Account',
       admin: 'Admin',
+      changeEmail: 'Change email',
+      sendVerification: 'Send verification',
+      emailChangeSent: 'Verification link sent to the new email. Your email will update once you confirm.',
+      setAsPrimary: 'Set as primary',
       setAsDefault: 'Set as default',
       default: 'Default',
+      primaryEmailBadge: 'Primary (used to sign in)',
+      recoveryEmailBadge: 'Recovery',
+      emailSectionPrimaryHelp: 'Used for sign-in and all account-critical messages. Must be verified.',
+      emailSectionRecoveryHelp: 'Used only if you lose access to your primary email, and for security alerts. Must be verified.',
+      emailSectionIntro: 'Primary email is used for sign-in and account-critical messages. Recovery email is used only if you lose access to your primary, and for security alerts. Both must be verified.',
       addAnotherEmail: 'Add another email',
+      addRecoveryEmail: 'Add recovery email',
+      emailRecoveryHelp: "Password reset links are sent to your main email. Add a recovery email so we have another way to reach you if you lose access to it.",
+      forgotPassword: 'Forgot password?',
+      forgotPasswordTitle: 'Forgot password?',
+      forgotPasswordIntro: 'Enter your email and we’ll send a reset link.',
+      backToLogin: 'Back to login',
+      enterEmail: 'Enter your email.',
+      sendResetLink: 'Send reset link',
+      resetLinkSent: 'Check your email for a reset link. It was sent to your main email address.',
+      setNewPassword: 'Set new password',
+      setNewPasswordTitle: 'Set your new password',
+      setNewPasswordSuccess: 'Password updated. You can now sign in.',
       security: 'Security',
       dataAndPrivacy: 'Data and account',
       exportAllData: 'Export all data',
@@ -956,7 +1004,7 @@ const LanguageService = {
       recoveryEmail: 'Recovery / secondary email',
       recoveryEmailHelp: 'Optional email for recovery or notifications. Stored only in your profile.',
       twoFactorAuth: 'Two-factor authentication (2FA)',
-      twoFactorHelp: 'Scan the QR code with an authenticator app (e.g. Google Authenticator) for extra security.',
+      twoFactorHelp: 'Enable 2FA for extra security. Use an authenticator app.',
       twoFactorOnStatus: '2FA is on. You can disable it below.',
       enable2FA: 'Enable 2FA',
       disable2FA: 'Disable 2FA',
@@ -966,7 +1014,11 @@ const LanguageService = {
       copied: 'Copied',
       mfaChallengePrompt: 'Enter the 6‑digit code from your authenticator app.',
       verificationCode: 'Verification code',
-      verify: 'Verify'
+      verify: 'Verify',
+      mfaChooseMethodIntro: 'Choose how you want to verify your identity when signing in.',
+      mfaMethodAuthenticator: 'Authenticator app',
+      mfaMethodAuthenticatorDesc: "Use an app like Google Authenticator. Scan a QR code or enter a key if you can't scan.",
+      mfaAuthenticatorSetup: 'Authenticator app setup'
     }
   },
   init() {
@@ -1085,15 +1137,19 @@ function updateLoginPaneShareContext() {
 function showLoginPane() {
   document.getElementById("login-pane").classList.remove("hidden");
   document.getElementById("signup-pane").classList.add("hidden");
+  document.getElementById("recovery-set-password-pane").classList.add("hidden");
+  document.getElementById("forgot-password-pane").classList.add("hidden");
   document.getElementById("login-feedback").textContent = "";
-  document.getElementById("login-feedback").className = "";
+  document.getElementById("login-feedback").className = "login-feedback-common";
   updateLoginPaneShareContext();
 }
 function showSignupPane() {
   document.getElementById("signup-pane").classList.remove("hidden");
   document.getElementById("login-pane").classList.add("hidden");
+  document.getElementById("recovery-set-password-pane").classList.add("hidden");
+  document.getElementById("forgot-password-pane").classList.add("hidden");
   document.getElementById("login-feedback").textContent = "";
-  document.getElementById("login-feedback").className = "";
+  document.getElementById("login-feedback").className = "login-feedback-common";
   const hint = document.getElementById("signup-pane-return-hint");
   if (hint) {
     const loans = StorageService.load("loanData") || [];
@@ -1101,34 +1157,45 @@ function showSignupPane() {
   }
 }
 
-/** Build email list for Account: primary first (with Default), then secondary. */
+function showRecoverySetPasswordPane() {
+  document.getElementById("login-pane").classList.add("hidden");
+  document.getElementById("signup-pane").classList.add("hidden");
+  document.getElementById("recovery-set-password-pane").classList.remove("hidden");
+  document.getElementById("forgot-password-pane").classList.add("hidden");
+  document.getElementById("login-feedback").textContent = "";
+  document.getElementById("login-feedback").className = "login-feedback-common";
+  document.getElementById("recovery-set-password-feedback").textContent = "";
+  document.getElementById("recovery-set-password-feedback").className = "login-feedback-common";
+}
+
+/** Build email list for Account: primary first (used to sign in), then recovery. */
 function renderAccountEmailList(user) {
   const listEl = document.getElementById("account-email-list");
   if (!listEl) return;
   const primary = (user.email || "").trim();
   const recovery = (user.user_metadata && user.user_metadata.recovery_email) ? String(user.user_metadata.recovery_email).trim() : "";
   const emails = [];
-  if (primary) emails.push({ email: primary, isDefault: true });
-  if (recovery && recovery.toLowerCase() !== primary.toLowerCase()) emails.push({ email: recovery, isDefault: false });
-  const defaultLabel = escapeHtml(LanguageService.translate("default"));
+  if (primary) emails.push({ email: primary, role: "primary" });
+  if (recovery && recovery.toLowerCase() !== primary.toLowerCase()) emails.push({ email: recovery, role: "recovery" });
+  const primaryBadge = escapeHtml(LanguageService.translate("primaryEmailBadge") || "Primary (used to sign in)");
+  const recoveryBadge = escapeHtml(LanguageService.translate("recoveryEmailBadge") || "Recovery");
   const changeLabel = escapeHtml(LanguageService.translate("changeEmail"));
-  const setDefaultLabel = escapeHtml(LanguageService.translate("setAsDefault"));
   const deleteLabel = escapeHtml(LanguageService.translate("delete"));
   const setDefaultFirstTitle = escapeHtml(LanguageService.translate("setDefaultFirst"));
-  listEl.innerHTML = emails.map(({ email, isDefault }) => {
+  listEl.innerHTML = emails.map(({ email, role }) => {
     const safeEmail = escapeHtml(email);
-    const canDelete = !isDefault;
-    const canSetDefault = !isDefault;
-    return `<div class="account-email-item-wrap" data-email="${escapeHtml(email)}" data-is-default="${isDefault}">
+    const isPrimary = role === "primary";
+    const canDelete = !isPrimary;
+    const badge = isPrimary ? primaryBadge : recoveryBadge;
+    const menuItems = isPrimary
+      ? `<button type="button" role="menuitem" data-action="change">${changeLabel}</button><button type="button" role="menuitem" data-action="delete" disabled title="${setDefaultFirstTitle}">${deleteLabel}</button>`
+      : `<button type="button" role="menuitem" data-action="delete">${deleteLabel}</button>`;
+    return `<div class="account-email-item-wrap" data-email="${escapeHtml(email)}" data-is-default="${isPrimary}">
       <div class="account-email-item">
         <span class="account-email-address">${safeEmail}</span>
-        ${isDefault ? `<span class="account-email-default-badge">${defaultLabel}</span>` : ""}
+        <span class="account-email-role-badge">${badge}</span>
         <button type="button" class="account-email-menu-btn" aria-haspopup="true" aria-expanded="false" title="Menu">⋮</button>
-        <div class="account-email-menu" role="menu">
-          <button type="button" role="menuitem" data-action="change">${changeLabel}</button>
-          <button type="button" role="menuitem" data-action="setDefault" ${!canSetDefault ? "disabled" : ""}>${setDefaultLabel}</button>
-          <button type="button" role="menuitem" data-action="delete" ${!canDelete ? `disabled title="${setDefaultFirstTitle}"` : ""}>${deleteLabel}</button>
-        </div>
+        <div class="account-email-menu" role="menu">${menuItems}</div>
       </div>
     </div>`;
   }).join("");
@@ -1164,22 +1231,23 @@ async function populateAccountSettings() {
   const mfaStatusText = document.getElementById("account-mfa-status");
   const factors = await AuthService.mfaListFactors();
   const hasTotp = factors.data && factors.data.totp && factors.data.totp.length > 0;
+  const has2FA = hasTotp;
   if (mfaEnableBtn) {
-    mfaEnableBtn.style.display = hasTotp ? "none" : "";
-    mfaEnableBtn.classList.toggle("hidden", !!hasTotp);
+    mfaEnableBtn.style.display = has2FA ? "none" : "";
+    mfaEnableBtn.classList.toggle("hidden", !!has2FA);
   }
   if (mfaDisableBtn) {
-    mfaDisableBtn.style.display = hasTotp ? "" : "none";
-    mfaDisableBtn.classList.toggle("hidden", !hasTotp);
+    mfaDisableBtn.style.display = has2FA ? "" : "none";
+    mfaDisableBtn.classList.toggle("hidden", !has2FA);
   }
   if (mfaStatusText) {
-    mfaStatusText.textContent = hasTotp
+    mfaStatusText.textContent = has2FA
       ? (LanguageService.translate("twoFactorOnStatus") || "2FA is on. You can disable it below.")
       : "";
-    mfaStatusText.classList.toggle("hidden", !hasTotp);
+    mfaStatusText.classList.toggle("hidden", !has2FA);
   }
   const mfaHelp = document.querySelector(".account-mfa-help");
-  if (mfaHelp) mfaHelp.classList.toggle("hidden", !!hasTotp);
+  if (mfaHelp) mfaHelp.classList.toggle("hidden", !!has2FA);
 }
 
 /** Strong password: min 8 chars, at least one upper, one lower, one number or special */
@@ -2510,8 +2578,8 @@ const UIHandler = {
     const user = await AuthService.getUser();
     if (!user || !user.email) return;
     const factors = await AuthService.mfaListFactors();
-    const has2FA = factors.data && factors.data.totp && factors.data.totp.length > 0;
-    if (has2FA) return;
+    const hasTotp = factors.data && factors.data.totp && factors.data.totp.length > 0;
+    if (hasTotp) return;
     const recoveryEmail = (user.user_metadata && user.user_metadata.recovery_email) ? String(user.user_metadata.recovery_email).trim() : "";
     const hasRecoveryEmail = recoveryEmail.length > 0 && recoveryEmail.toLowerCase() !== (user.email || "").toLowerCase();
     const dismissed = localStorage.getItem("lendpile_securityPrompt");
@@ -3869,10 +3937,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const params = new URLSearchParams(hash);
     const accessToken = params.get("access_token");
     const refreshToken = params.get("refresh_token");
+    const type = params.get("type");
     if (accessToken && supabaseClient) {
       try {
         await supabaseClient.auth.setSession({ access_token: accessToken, refresh_token: refreshToken || "" });
-        window._emailJustVerified = true;
+        if (type === "recovery") window._recoverySetPassword = true;
+        else window._emailJustVerified = true;
       } catch (e) {
         console.error("Session recovery from URL failed:", e);
       }
@@ -3884,7 +3954,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (error || errorCode || errorDesc) {
         const feedback = document.getElementById("login-feedback");
         feedback.textContent = LanguageService.translate("linkExpiredOrInvalid");
-        feedback.className = "";
+        feedback.className = "login-feedback-common";
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
     }
@@ -3969,6 +4039,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
   if (!needMfaChallenge) {
+    if (window._recoverySetPassword) {
+      document.body.style.overflow = "hidden";
+      loginModal.style.display = "flex";
+      showRecoverySetPasswordPane();
+    }
     const user = await AuthService.getUser();
     if (user) {
       const syncedData = await SyncService.loadData();
@@ -4380,14 +4455,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       UIHandler.showFeedback(result.error || "Error");
     }
   });
-  /* Account section: enable 2FA – open enroll modal */
+  /* Account section: enable 2FA – start authenticator setup */
   document.getElementById("account-mfa-enable")?.addEventListener("click", async () => {
+    await startMfaEnrollAuthenticator();
+  });
+
+  /* Start TOTP (authenticator app) enroll: fetch QR + secret and show enroll modal */
+  async function startMfaEnrollAuthenticator() {
     const feedback = document.getElementById("mfa-enroll-feedback");
     const qrEl = document.getElementById("mfa-enroll-qr");
     const secretWrap = document.getElementById("mfa-secret-wrap");
     const secretEl = document.getElementById("mfa-enroll-secret");
     const codeEl = document.getElementById("mfa-enroll-code");
     if (!qrEl || !codeEl || !feedback) return;
+    const factors = await AuthService.mfaListFactors();
+    const existing = factors?.data?.totp && factors.data.totp[0];
+    if (existing) {
+      UIHandler.showFeedback(LanguageService.translate("twoFactorOnStatus") || "2FA is already enabled.");
+      UIHandler.closeModal("mfa-enroll-modal");
+      await populateAccountSettings();
+      return;
+    }
     qrEl.innerHTML = "";
     codeEl.value = "";
     feedback.textContent = "";
@@ -4397,15 +4485,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const { data, error } = await AuthService.mfaEnroll();
     if (error) {
       let msg = error.message || "Failed to start 2FA setup.";
-      if (error.status === 422 || msg.toLowerCase().includes("422") || msg.toLowerCase().includes("unprocessable")) {
+      const msgLower = msg.toLowerCase();
+      if (msgLower.includes("already exists")) {
+        msg = LanguageService.translate("twoFactorOnStatus") || "2FA is already enabled.";
+        UIHandler.showFeedback(msg);
+        UIHandler.closeModal("mfa-enroll-modal");
+        await populateAccountSettings();
+        return;
+      }
+      if (error.status === 422 || msgLower.includes("422") || msgLower.includes("unprocessable")) {
         msg += " Enable MFA in Supabase Dashboard: Authentication → Multi-Factor (MFA).";
       }
-      feedback.textContent = msg;
-      feedback.className = "error";
-      UIHandler.showModal("mfa-enroll-modal");
+      UIHandler.showFeedback(msg);
+      UIHandler.closeModal("mfa-enroll-modal");
       return;
     }
     const totp = data && data.totp;
+    if (!totp) {
+      UIHandler.showFeedback("Unable to start authenticator setup. Please try again.");
+      return;
+    }
     const svg = totp && totp.qr_code;
     if (svg && typeof svg === "string") {
       if (svg.trim().toLowerCase().startsWith("<svg")) {
@@ -4434,9 +4533,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       secretEl.textContent = secret;
       secretWrap.style.display = "block";
     }
+    if (!svg && !secret) {
+      UIHandler.showFeedback("QR code was not returned. Please try again.");
+      return;
+    }
     window._mfaEnrollFactorId = data ? data.id : null;
     UIHandler.showModal("mfa-enroll-modal");
-  });
+  }
+
   document.getElementById("mfa-copy-secret")?.addEventListener("click", () => {
     const secretEl = document.getElementById("mfa-enroll-secret");
     if (!secretEl || !secretEl.textContent) return;
@@ -4504,11 +4608,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       onConfirm: async () => {
         const factors = await AuthService.mfaListFactors();
         const totp = factors.data && factors.data.totp && factors.data.totp[0];
-        if (!totp) return;
-        const { error } = await AuthService.mfaUnenroll(totp.id);
-        if (error) {
-          UIHandler.showFeedback(error.message || "Failed to disable 2FA.");
-          return;
+        if (totp) {
+          const { error } = await AuthService.mfaUnenroll(totp.id);
+          if (error) {
+            UIHandler.showFeedback(error.message || "Failed to disable 2FA.");
+            return;
+          }
         }
         await populateAccountSettings();
         UIHandler.showFeedback(LanguageService.translate("settingsSaved"));
@@ -5004,18 +5109,21 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const feedback = document.getElementById("login-feedback");
   feedback.textContent = "";
-  feedback.className = "";
+  feedback.className = "login-feedback-common";
   const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-password").value;
   if (!email || !password) {
     feedback.textContent = LanguageService.translate("enterEmailAndPassword");
+    feedback.className = "login-feedback-common";
     return;
   }
   const result = await AuthService.signIn(email, password);
   if (!result.success) {
     feedback.textContent = result.error;
+    feedback.className = "login-feedback-common";
     return;
   }
+  const user = await AuthService.getUser();
   const aal = await AuthService.getAuthenticatorAssuranceLevel();
   if (aal.nextLevel === "aal2" && aal.nextLevel !== aal.currentLevel) {
     document.getElementById("login-modal").style.display = "none";
@@ -5105,27 +5213,103 @@ document.getElementById("login-modal-close").addEventListener("click", () => {
   showLoginPane();
 });
 
+document.getElementById("login-forgot-password-btn")?.addEventListener("click", async () => {
+  const email = document.getElementById("login-email")?.value?.trim();
+  document.getElementById("login-pane").classList.add("hidden");
+  document.getElementById("signup-pane").classList.add("hidden");
+  document.getElementById("recovery-set-password-pane").classList.add("hidden");
+  document.getElementById("forgot-password-pane").classList.remove("hidden");
+  const forgotEmail = document.getElementById("forgot-password-email");
+  if (forgotEmail && !forgotEmail.value && email) forgotEmail.value = email;
+  const forgotFeedback = document.getElementById("forgot-password-feedback");
+  forgotFeedback.textContent = "";
+  forgotFeedback.className = "login-feedback-common";
+  const loginFeedback = document.getElementById("login-feedback");
+  loginFeedback.textContent = "";
+  loginFeedback.className = "login-feedback-common";
+});
+
+document.getElementById("forgot-password-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("forgot-password-email")?.value?.trim();
+  const feedback = document.getElementById("forgot-password-feedback");
+  feedback.textContent = "";
+  feedback.className = "login-feedback-common";
+  if (!email) {
+    feedback.textContent = LanguageService.translate("enterEmail") || "Enter your email.";
+    feedback.className = "login-feedback-common";
+    return;
+  }
+  const redirectTo = window.location.origin + window.location.pathname;
+  const result = await AuthService.resetPasswordForEmail(email, redirectTo);
+  if (result.error) {
+    feedback.textContent = result.error;
+    feedback.className = "login-feedback-common";
+    return;
+  }
+  feedback.textContent = LanguageService.translate("resetLinkSent") || "Check your email for a reset link. It was sent to your main email address.";
+  feedback.className = "login-feedback-common success";
+});
+
+document.getElementById("forgot-to-login-link")?.addEventListener("click", () => {
+  showLoginPane();
+});
+
+document.getElementById("recovery-set-password-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const feedback = document.getElementById("recovery-set-password-feedback");
+  const newPass = document.getElementById("recovery-new-password")?.value;
+  const confirmPass = document.getElementById("recovery-confirm-password")?.value;
+  feedback.textContent = "";
+  feedback.className = "";
+  if (newPass !== confirmPass) {
+    feedback.textContent = LanguageService.translate("passwordsDoNotMatch");
+    feedback.className = "login-feedback-common";
+    return;
+  }
+  if (!isStrongPassword(newPass)) {
+    feedback.textContent = LanguageService.translate("invalidPasswordStrength");
+    feedback.className = "login-feedback-common";
+    return;
+  }
+  const result = await AuthService.updateUser({ password: newPass });
+  if (result.error) {
+    feedback.textContent = result.error;
+    feedback.className = "login-feedback-common";
+    return;
+  }
+  window._recoverySetPassword = false;
+  feedback.textContent = LanguageService.translate("setNewPasswordSuccess") || "Password updated. You can now sign in.";
+  feedback.className = "login-feedback-common success";
+  document.getElementById("login-modal").style.display = "none";
+  UIHandler.restoreBodyScroll();
+  showLoginPane();
+  const syncedData = await SyncService.loadData();
+  await finishLoginSuccess(syncedData ?? []);
+});
+
 document.getElementById("signup-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const feedback = document.getElementById("login-feedback");
   feedback.textContent = "";
-  feedback.className = "";
+  feedback.className = "login-feedback-common";
   const email = document.getElementById("signup-email").value.trim();
   const displayName = document.getElementById("signup-display-name") && document.getElementById("signup-display-name").value.trim();
   const password = document.getElementById("signup-password").value;
   const confirm = document.getElementById("signup-password-confirm").value;
   if (!email || !password) {
     feedback.textContent = LanguageService.translate("enterEmailAndPassword");
+    feedback.className = "login-feedback-common";
     return;
   }
   if (password !== confirm) {
     feedback.textContent = LanguageService.translate("passwordsDoNotMatch");
-    feedback.className = "error";
+    feedback.className = "login-feedback-common";
     return;
   }
   if (!isStrongPassword(password)) {
     feedback.textContent = LanguageService.translate("invalidPasswordStrength");
-    feedback.className = "error";
+    feedback.className = "login-feedback-common";
     return;
   }
   const shareToken = window._pendingShareToken;
@@ -5142,10 +5326,10 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
       msg += "\n\n" + returnMsg;
     }
     feedback.textContent = msg;
-    feedback.className = "success";
+    feedback.className = "login-feedback-common success";
     document.getElementById("signup-form").reset();
   } else {
     feedback.textContent = result.error;
-    feedback.className = "error";
+    feedback.className = "login-feedback-common";
   }
 });

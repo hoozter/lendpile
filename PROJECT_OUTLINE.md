@@ -38,11 +38,10 @@ Data lives in **localStorage** by default. When the user is **logged in** (Supab
 
 So: **the login does real work** – it gates access to Supabase-backed sync. Without a Supabase project (or with wrong URL/key), login will fail; with a valid project and `loan_data` table, login enables cloud backup/restore.
 
-### What’s not in the repo
+### What’s included beyond the UI
 
-- **Supabase schema**: no SQL or migration files. The code assumes a table like:
-  - `loan_data (user_id uuid PRIMARY KEY, data jsonb, ...)` and RLS so users only see their own row.
-- **Admin**: no UI to list users, disable accounts, or manage roles. Supabase Dashboard is the only way to do that today.
+- **Supabase schema**: provided in `docs/supabase-schema.sql` (plus `docs/check-schema.sql` for verification).
+- **Admin**: `admin.html` + Cloudflare Worker for listing and deleting users (see README for setup).
 
 ---
 
@@ -57,28 +56,16 @@ So: **the login does real work** – it gates access to Supabase-backed sync. Wi
 | Auth (Supabase)   | Implemented (login/signup/logout + “offline”). |
 | Sync to Supabase  | Implemented (upsert `loan_data` on save). |
 | Login modal UX    | Redesigned (clear auth screen, i18n, “continue without account” as link). |
-| DB schema in repo | Missing (table + RLS not versioned). |
-| User account (Settings) | Implemented: display name, recovery/secondary email (set, delete), 2FA (TOTP enroll/disable). Profile shows display name when set; MFA challenge at login when enabled. |
-| Admin / superuser      | Not implemented (Dashboard only). |
+| DB schema in repo | Implemented (see `docs/supabase-schema.sql`). |
+| User account (Settings) | Implemented: display name, recovery/secondary email (set, delete), 2FA (TOTP enroll/disable), password reset (email link + set new password). Profile shows display name when set; MFA challenge at login when enabled. |
+| Admin / superuser      | Implemented: admin dashboard + Worker-backed API. |
 
 ---
 
 ## Clear improvements
 
-1. **Supabase schema in repo**  
-   Add SQL (e.g. `supabase/migrations/...sql` or a single `schema.sql`) that creates `loan_data` and RLS so the app works after a fresh Supabase setup.
-
-2. **Config for Supabase**  
-   Move `SUPABASE_URL` and `SUPABASE_ANON_KEY` to a small config (e.g. env or `config.js`) so keys are not hardcoded in the main HTML (and different keys can be used for dev/prod).
-
-3. **Sign-out and “current user”**  
-   There is no visible “Log out” or “Signed in as …”. Adding a user menu in the header (e.g. next to settings) with sign-out and optionally “Sync status” would make auth state clear.
-
-4. **Sync feedback**  
-   Sync is silent; on failure it only logs to console. Showing a short “Synced” / “Sync failed” (e.g. in header or toast) would help.
-
-5. **Admin / account administration**  
-   Implement a simple admin area (e.g. `/admin` or role-gated section) to list users, disable accounts, or manage roles – either via Supabase Admin API (server/edge) or Supabase Dashboard until then.
+1. **Sync feedback**  
+  Sync is silent; on failure it only logs to console. Showing a short “Synced” / “Sync failed” (e.g. in header or toast) would help.
 
 ---
 
@@ -86,29 +73,25 @@ So: **the login does real work** – it gates access to Supabase-backed sync. Wi
 
 ### Phase 1 – Reliable auth and sync (recommended first)
 
-1. **Define and document Supabase schema**  
-   - Create `loan_data` with `user_id` (references `auth.users`) and `data` (jsonb).  
-   - Add RLS: `SELECT/INSERT/UPDATE/DELETE` only for `auth.uid() = user_id`.  
-   - Put this in a file in the repo (e.g. `docs/supabase-schema.sql` or a real migration) and add a short “Database setup” section to the README.
+1. **Define and document Supabase schema (done)**  
+   - `docs/supabase-schema.sql` provides `loan_data` + RLS; README includes setup notes.
 
-2. **Optional: config**  
-   - Move Supabase URL and anon key to a single place (e.g. `config.js` or build-time env) so production can use a different project than dev.
+2. **Optional: config (done)**  
+   - `config.example.js` + `scripts/write-config.js` handle local/dev and deploy configuration.
 
-3. **Sign-out and user indicator**  
-   - In the header, when the user is logged in: show “Signed in as &lt;email&gt;” or an icon, and a “Log out” action that calls `AuthService.signOut()` and optionally clears `offlineMode` / reloads.
+3. **Sign-out and user indicator (done)**  
+   - Header profile menu provides sign-out; profile info is shown in the user menu.
 
 4. **Basic sync feedback**  
    - After `SyncService.syncData()`, show a brief “Synced” or “Sync failed: &lt;message&gt;” (e.g. small toast or header message).
 
 ### Phase 2 – Admin and account management
 
-5. **Admin area**  
-   - Option A: Separate admin page (e.g. `admin.html`) or route, protected by a “superuser” or admin role stored in Supabase (e.g. `profiles.role` or similar).  
-   - Option B: Use Supabase Dashboard + Auth for now; document “how to disable/delete users” in README.  
-   - If building Option A: use Supabase Admin API (requires a backend or Edge Function with the service role key) to list users, update metadata, or disable accounts.
+5. **Admin area (done)**  
+   - Admin UI lives in `admin.html` and is backed by the Cloudflare Worker API.
 
-6. **Account lifecycle**  
-   - Document or implement: sign up → email confirmation (Supabase default) → sign in; optional “Forgot password” link using Supabase’s reset flow.
+6. **Account lifecycle (done)**  
+   - Implemented: sign up → email confirmation (Supabase default) → sign in; “Forgot password” uses Supabase reset flow with in-app set new password.
 
 7. **User administration (done)**  
    - **Display name**: Settings → Account; stored in `user_metadata.display_name`; shown in profile header and used when sharing (e.g. “David is sharing a loan”).  
@@ -141,5 +124,5 @@ So: **the login does real work** – it gates access to Supabase-backed sync. Wi
 
 - **What it is**: Single-page loan/amortization tracker with optional Supabase auth and sync.
 - **What login does**: Enables syncing loan data to Supabase; “continue without account” uses only localStorage.
-- **Gaps**: Schema not in repo, no sign-out/user indicator, no sync feedback, no admin UI.
-- **Next steps**: Add schema + doc, optional config, sign-out + user indicator, sync feedback; then plan admin (Dashboard vs custom admin page).
+- **Gaps**: Sync feedback is still silent; a small toast/banner would improve clarity.
+- **Next steps**: Add sync feedback; then review larger roadmap items if needed.

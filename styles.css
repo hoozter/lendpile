@@ -80,8 +80,14 @@ button.btn-delete { background-color: var(--button-delete); }
 button.btn-delete:hover { background-color: #c9302c; }
 button.btn-edit { background-color: var(--button-edit); }
 button.btn-edit:hover { background-color: #ec971f; }
-button.btn-add, button.btn-view, button.btn-chart, button.btn-duplicate { background-color: var(--primary-color); width: fit-content; }
-button.btn-add:hover, button.btn-view:hover, button.btn-chart:hover, button.btn-duplicate:hover { background-color: var(--button-hover); }
+button.btn-secondary {
+  background-color: var(--input-background);
+  color: var(--text-color);
+  border: 1px solid var(--input-border);
+}
+button.btn-secondary:hover { background-color: var(--section-background); }
+button.btn-add { background-color: var(--primary-color); width: fit-content; }
+button.btn-add:hover { background-color: var(--button-hover); }
 
 input[type="text"],
 input[type="number"],
@@ -646,8 +652,6 @@ th, td {
 }
 .amortization-table td { vertical-align: middle; }
 .amortization-table button { min-width: 80px; }
-.chart-wrapper { position: relative; z-index: 1; width: 800px; height: 400px; }
-
 /* =============================
    OVERPAYMENT WARNING
 ============================= */
@@ -1098,27 +1102,6 @@ th, td {
 .loan-detail-payment-plans .amortizations-section-title { margin-bottom: 14px; }
 .loan-detail-chart-pane { padding: 16px 0; }
 #loan-detail-chart-container { width: 100%; height: 380px; min-height: 300px; }
-.loan-card {
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  background-color: var(--section-background);
-  box-shadow: 0 2px 5px var(--card-shadow);
-}
-.loan-details {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin: 15px 0;
-}
-.loan-actions {
-  display: flex;
-  gap: 15px;
-  margin-top: 25px;
-  padding-top: 20px;
-  border-top: 1px solid var(--input-border);
-}
 .forecast-section {
   border-left: 4px solid var(--primary-color);
   margin: 15px 0;
@@ -1279,11 +1262,8 @@ th, td {
 @media (max-width: 768px) {
   .container { padding: 15px; }
   .modal-content { width: 95%; margin: 5vh auto; padding: 20px; }
-  .loan-actions { flex-direction: column; }
-  .loan-details { grid-template-columns: 1fr; }
 }
 @media print {
-  .no-print { display: none !important; }
   body { padding: 0; background: white; }
   .container { box-shadow: none; max-width: 100%; }
   table { font-size: 10pt; }
@@ -1362,6 +1342,24 @@ th, td {
 }
 #login-modal .login-form-group input::placeholder {
   opacity: 0.6;
+}
+#login-modal .login-forgot-wrap {
+  margin-top: 8px;
+}
+#login-modal .login-forgot-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: underline;
+}
+#login-modal .login-forgot-link:hover {
+  color: var(--button-hover);
+}
+#login-modal .recovery-set-password-pane.hidden {
+  display: none;
 }
 #login-modal .login-field-hint {
   font-size: 12px;
@@ -1444,6 +1442,7 @@ th, td {
 #login-modal .login-switch-link:hover { color: var(--link-hover, #357ab8); }
 #login-modal #login-feedback,
 #login-modal .login-feedback-common {
+  display: none;
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 6px;
@@ -1453,7 +1452,12 @@ th, td {
   color: var(--button-delete);
   white-space: pre-line;
 }
-#login-modal #login-feedback.success {
+#login-modal #login-feedback:not(:empty),
+#login-modal .login-feedback-common:not(:empty) {
+  display: block;
+}
+#login-modal #login-feedback.success,
+#login-modal .login-feedback-common.success {
   background: rgba(40, 167, 69, 0.12);
   color: #2d9d4a;
 }
@@ -1631,12 +1635,6 @@ th, td {
   color: var(--text-color);
   opacity: 0.85;
 }
-.account-subtitle {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-  color: var(--text-color);
-}
 .account-email-list {
   margin-bottom: 10px;
 }
@@ -1654,7 +1652,7 @@ th, td {
   word-break: break-all;
   color: var(--text-color);
 }
-.account-email-default-badge {
+.account-email-role-badge {
   font-size: 11px;
   text-transform: uppercase;
   color: var(--text-color-muted, #666);
@@ -1921,3 +1919,4 @@ th, td {
 }
 .mfa-feedback.error { color: var(--button-delete); }
 .mfa-feedback.success { color: #2d9d4a; }
+
