@@ -35,10 +35,12 @@
         <img src="assets/lendpile.svg" alt="Lendpile" class="logo" />
       </div>
       <div class="controls-right">
-        <div id="user-header-block" class="user-header-block">
+        <div id="user-header-block" class="user-header-block" role="region" aria-label="Account">
           <button type="button" class="profile-icon-btn toolbar-btn" id="profile-icon-btn" title="Account" aria-haspopup="true" aria-expanded="false">
-            <span class="material-icons">account_circle</span>
+            <span class="material-icons profile-icon-img">account_circle</span>
           </button>
+          <span id="signed-out-label" class="signed-out-label hidden" data-translate="notSignedIn">Not signed in</span>
+          <span id="header-tooltip" class="header-status-tooltip" role="tooltip"></span>
           <div id="profile-dropdown" class="profile-dropdown" role="menu">
             <div class="profile-dropdown-email" id="profile-dropdown-email"></div>
             <button type="button" class="profile-dropdown-item" id="profile-account" role="menuitem">
@@ -77,6 +79,10 @@
     <div id="view-list" class="main-view">
       <section id="loan-info">
         <div id="list-summary" class="list-summary" aria-live="polite"></div>
+        <div id="save-to-account-bar" class="save-to-account-bar hidden" role="status">
+          <p class="save-to-account-text" id="save-to-account-message"></p>
+          <button type="button" class="btn-primary save-to-account-btn" id="save-to-account-btn" data-translate="saveToAccount">Save to account</button>
+        </div>
         <div class="loan-info-header">
           <h2 data-translate="myLoans">Mina lån</h2>
           <button class="btn-add" id="add-loan-btn" data-translate="addLoan">Lägg till Lån</button>
@@ -433,7 +439,8 @@
             <button type="button" class="btn-secondary account-mfa-disable hidden" id="account-mfa-disable" data-translate="disable2FA">Inaktivera 2FA</button>
           </div>
         </div>
-        <p class="account-field-help" data-translate="twoFactorHelp">Skanna QR‑koden med en autentiseringsapp för extra säkerhet.</p>
+        <p id="account-mfa-status" class="account-field-help hidden"></p>
+        <p class="account-field-help account-mfa-help" data-translate="twoFactorHelp">Skanna QR‑koden med en autentiseringsapp för extra säkerhet.</p>
 
         <h4 class="account-subtitle" data-translate="dataAndPrivacy">Data och konto</h4>
         <button type="button" class="btn-secondary account-export-data-btn" id="account-export-data-btn" data-translate="exportAllData">Exportera all data</button>
@@ -604,9 +611,13 @@
           <option value="30">30 dagar</option>
         </select>
       </div>
-      <div id="share-active-list-section" class="share-active-list-section hidden">
-        <h4 class="modal-section-subtitle" data-translate="activeSharesForThisLoan">Aktiva länkar för detta lån</h4>
-        <div id="share-active-list" class="share-active-list"></div>
+      <div id="share-active-links-section" class="share-active-list-section hidden">
+        <h4 class="modal-section-subtitle" data-translate="activeLinksForThisLoan">Aktiva länkar (ej öppnade än)</h4>
+        <div id="share-active-links" class="share-active-list"></div>
+      </div>
+      <div id="share-active-shares-section" class="share-active-list-section hidden">
+        <h4 class="modal-section-subtitle" data-translate="activeSharesForThisLoan">Aktiva delningar</h4>
+        <div id="share-active-shares" class="share-active-list"></div>
       </div>
       <div class="modal-actions">
         <button type="button" id="share-create-link-btn" class="btn-primary" data-translate="shareCreateLink">Skapa länk</button>
@@ -662,6 +673,7 @@
         <div class="login-header">
           <h2 data-translate="signUp">Create account</h2>
           <p data-translate="signUpSubtitle">Enter your email and choose a password to save and sync your loans.</p>
+          <p id="signup-pane-return-hint" class="login-field-hint signup-return-hint hidden" data-translate="signUpPaneReturnHint">After you confirm your email, return to this page to sign in. Your device loans can then be saved to your account.</p>
         </div>
         <form id="signup-form">
           <div class="login-form-group">

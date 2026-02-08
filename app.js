@@ -472,6 +472,16 @@ const LanguageService = {
       choosePassword: 'Välj ett lösenord',
       noAccountCreateOne: 'Har du inget konto? Skapa ett',
       haveAccountLogIn: 'Har du redan ett konto? Logga in',
+      notSignedIn: 'Ej inloggad',
+      offlineTooltip: 'Data finns bara på denna enhet. Logga in för att synka och säkerhetskopiera. När du loggar in kan du lägga till enhetens lån i ditt konto.',
+      localLoansAddToAccountTitle: 'Lägg till enhetens lån i ditt konto?',
+      localLoansAddToAccountMessage: 'Du har {n} lån på denna enhet som inte finns i ditt konto. Vill du lägga till dem?',
+      addToMyAccount: 'Lägg till i mitt konto',
+      discardUseAccount: 'Kasta och använd kontodata',
+      saveToAccount: 'Spara till konto',
+      saveToAccountMessage: 'Du har {n} lån på denna enhet. Spara dem till ditt konto så att de är säkra och synkas.',
+      signUpSuccessReturnToSave: 'Kom tillbaka till denna sida efter att du bekräftat din e-post för att logga in och spara dina {n} lån.',
+      signUpPaneReturnHint: 'Efter att du bekräftat din e-post, kom tillbaka till denna sida för att logga in. Dina lån på enheten kan då sparas till ditt konto.',
       offlineBannerText: 'Du använder appen utan konto. Data sparas bara på denna enhet. Logga in eller skapa konto för att spara och synka.',
       signInOrCreateAccount: 'Logga in eller skapa konto',
       enterEmailAndPassword: 'Ange e-post och lösenord.',
@@ -508,7 +518,9 @@ const LanguageService = {
       shareExpires: 'Länken går ut',
       shareCreateLink: 'Skapa länk',
       shareLinkCreated: 'Länk skapad. Dela den endast med den du vill ska se lånet.',
-      activeSharesForThisLoan: 'Aktiva länkar för detta lån',
+      activeLinksForThisLoan: 'Aktiva länkar (ej öppnade än)',
+      activeSharesForThisLoan: 'Aktiva delningar',
+      linkExpiresOn: 'Länken går ut',
       revokeShare: 'Återkalla',
       editRequestBanner: 'Redigeringsåtkomst begärd för {loanName} av {requester}.',
       editRequestApprovedBanner: 'Din begäran om redigeringsåtkomst för {name} godkändes.',
@@ -605,6 +617,7 @@ const LanguageService = {
       recoveryEmailHelp: 'Valfri. Du kan sätta den som inloggnings‑e‑post efter att du sparat; en verifieringslänk skickas.',
       twoFactorAuth: 'Tvåfaktorsautentisering (2FA)',
       twoFactorHelp: 'Skanna QR‑koden med en autentiseringsapp (t.ex. Google Authenticator) för extra säkerhet.',
+      twoFactorOnStatus: '2FA är på. Du kan inaktivera det nedan.',
       enable2FA: 'Aktivera 2FA',
       disable2FA: 'Inaktivera 2FA',
       mfaEnrollSteps: 'Skanna QR‑koden med din autentiseringsapp och ange sedan den 6‑siffriga koden nedan.',
@@ -804,6 +817,16 @@ const LanguageService = {
       choosePassword: 'Choose a password',
       noAccountCreateOne: "Don't have an account? Create one",
       haveAccountLogIn: 'Already have an account? Log in',
+      notSignedIn: 'Not signed in',
+      offlineTooltip: 'Data is only on this device. Sign in to sync and back up. If you sign in later, you can add device loans to your account.',
+      localLoansAddToAccountTitle: 'Add device loans to your account?',
+      localLoansAddToAccountMessage: 'You have {n} loan(s) on this device that aren\'t in your account. Add them to your account?',
+      addToMyAccount: 'Add to my account',
+      discardUseAccount: 'Discard and use account',
+      saveToAccount: 'Save to account',
+      saveToAccountMessage: "You have {n} loan(s) on this device. Save them to your account so they're safe and sync across devices.",
+      signUpSuccessReturnToSave: 'Return to this page after confirming your email to sign in and save your {n} loan(s) to your account.',
+      signUpPaneReturnHint: 'After you confirm your email, return to this page to sign in. Your device loans can then be saved to your account.',
       offlineBannerText: "You're working without an account. Data is stored only on this device. Sign in or create an account to save your progress and sync across devices.",
       signInOrCreateAccount: 'Sign in or create account',
       enterEmailAndPassword: 'Please enter email and password.',
@@ -840,7 +863,9 @@ const LanguageService = {
       shareExpires: 'Link expires in',
       shareCreateLink: 'Create link',
       shareLinkCreated: 'Link created. Share it only with the person who should see the loan.',
-      activeSharesForThisLoan: 'Active links for this loan',
+      activeLinksForThisLoan: 'Active links (not yet opened)',
+      activeSharesForThisLoan: 'Active shares',
+      linkExpiresOn: 'Link expires',
       revokeShare: 'Revoke',
       editRequestBanner: 'Edit access requested for {loanName} by {requester}.',
       editRequestApprovedBanner: 'Your edit access request for {name} was approved.',
@@ -932,6 +957,7 @@ const LanguageService = {
       recoveryEmailHelp: 'Optional email for recovery or notifications. Stored only in your profile.',
       twoFactorAuth: 'Two-factor authentication (2FA)',
       twoFactorHelp: 'Scan the QR code with an authenticator app (e.g. Google Authenticator) for extra security.',
+      twoFactorOnStatus: '2FA is on. You can disable it below.',
       enable2FA: 'Enable 2FA',
       disable2FA: 'Disable 2FA',
       mfaEnrollSteps: 'Scan the QR code with your authenticator app, then enter the 6‑digit code below.',
@@ -994,12 +1020,17 @@ const StorageService = {
 
 async function updateUserHeader() {
   const block = document.getElementById("user-header-block");
+  const signedOutLabel = document.getElementById("signed-out-label");
+  const tooltipEl = document.getElementById("header-tooltip");
+  const profileBtn = document.getElementById("profile-icon-btn");
   const emailEl = document.getElementById("profile-dropdown-email");
   const adminLink = document.getElementById("profile-admin");
   if (!block || !emailEl) return;
   const user = await AuthService.getUser();
   if (user && user.email) {
-    block.classList.add("visible");
+    block.classList.remove("signed-out");
+    if (signedOutLabel) signedOutLabel.classList.add("hidden");
+    if (profileBtn) profileBtn.removeAttribute("title");
     const displayName = (user.user_metadata && user.user_metadata.display_name) ? String(user.user_metadata.display_name).trim() : '';
     emailEl.textContent = displayName || user.email;
     document.getElementById("profile-dropdown").classList.remove("open");
@@ -1007,30 +1038,35 @@ async function updateUserHeader() {
       const isAdmin = user.app_metadata && user.app_metadata.role === "admin";
       adminLink.style.display = isAdmin ? "" : "none";
     }
-    const offlineBanner = document.getElementById("offline-banner");
-    if (offlineBanner) offlineBanner.classList.add("hidden");
+    updateSaveToAccountBar();
   } else {
-    block.classList.remove("visible");
-    if (adminLink) adminLink.style.display = "none";
+    block.classList.add("signed-out");
+    if (signedOutLabel) signedOutLabel.classList.remove("hidden");
+    if (tooltipEl) tooltipEl.textContent = LanguageService.translate("offlineTooltip") || "Data is only on this device. Sign in to sync and back up.";
+    if (profileBtn) profileBtn.setAttribute("title", "");
+    updateSaveToAccountBar();
   }
 }
 
 async function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");
-  const textEl = document.getElementById("offline-banner-text");
-  const btn = document.getElementById("offline-banner-signin-btn");
-  if (!banner || !textEl || !btn) return;
+  if (!banner) return;
+  banner.classList.add("hidden");
+}
+
+async function updateSaveToAccountBar() {
+  const bar = document.getElementById("save-to-account-bar");
+  const msgEl = document.getElementById("save-to-account-message");
+  if (!bar || !msgEl) return;
   const user = await AuthService.getUser();
-  if (user && user.email) {
-    banner.classList.add("hidden");
-    return;
-  }
-  if (localStorage.getItem("offlineMode")) {
-    banner.classList.remove("hidden");
-    textEl.textContent = LanguageService.translate("offlineBannerText") || "You're working without an account. Sign in or create an account to save and sync.";
-    btn.textContent = LanguageService.translate("signInOrCreateAccount") || "Sign in or create account";
+  const loans = StorageService.load("loanData") || [];
+  const n = loans.length;
+  if (!user && n > 0) {
+    bar.classList.remove("hidden");
+    const template = LanguageService.translate("saveToAccountMessage") || "You have {n} loan(s) on this device. Save them to your account so they're safe and sync across devices.";
+    msgEl.textContent = template.replace("{n}", String(n));
   } else {
-    banner.classList.add("hidden");
+    bar.classList.add("hidden");
   }
 }
 
@@ -1058,6 +1094,11 @@ function showSignupPane() {
   document.getElementById("login-pane").classList.add("hidden");
   document.getElementById("login-feedback").textContent = "";
   document.getElementById("login-feedback").className = "";
+  const hint = document.getElementById("signup-pane-return-hint");
+  if (hint) {
+    const loans = StorageService.load("loanData") || [];
+    hint.classList.toggle("hidden", loans.length === 0);
+  }
 }
 
 /** Build email list for Account: primary first (with Default), then secondary. */
@@ -1120,10 +1161,25 @@ async function populateAccountSettings() {
   }
   const mfaEnableBtn = document.getElementById("account-mfa-enable");
   const mfaDisableBtn = document.getElementById("account-mfa-disable");
+  const mfaStatusText = document.getElementById("account-mfa-status");
   const factors = await AuthService.mfaListFactors();
   const hasTotp = factors.data && factors.data.totp && factors.data.totp.length > 0;
-  if (mfaEnableBtn) mfaEnableBtn.style.display = hasTotp ? "none" : "";
-  if (mfaDisableBtn) mfaDisableBtn.style.display = hasTotp ? "" : "none";
+  if (mfaEnableBtn) {
+    mfaEnableBtn.style.display = hasTotp ? "none" : "";
+    mfaEnableBtn.classList.toggle("hidden", !!hasTotp);
+  }
+  if (mfaDisableBtn) {
+    mfaDisableBtn.style.display = hasTotp ? "" : "none";
+    mfaDisableBtn.classList.toggle("hidden", !hasTotp);
+  }
+  if (mfaStatusText) {
+    mfaStatusText.textContent = hasTotp
+      ? (LanguageService.translate("twoFactorOnStatus") || "2FA is on. You can disable it below.")
+      : "";
+    mfaStatusText.classList.toggle("hidden", !hasTotp);
+  }
+  const mfaHelp = document.querySelector(".account-mfa-help");
+  if (mfaHelp) mfaHelp.classList.toggle("hidden", !!hasTotp);
 }
 
 /** Strong password: min 8 chars, at least one upper, one lower, one number or special */
@@ -1741,6 +1797,7 @@ const UIHandler = {
     this._mergedLoansList = merged;
     loansList.innerHTML = merged.map((loan, i) => UIHandler.createLoanCardCompact(loan, i)).join("");
     this.bindCompactCardMenus();
+    updateSaveToAccountBar();
   },
   computeListSummary(loans) {
     const byCurrency = {};
@@ -1872,7 +1929,7 @@ const UIHandler = {
     const current = StorageService.load("loanData") || [];
     const updated = [...current, copy];
     StorageService.save("loanData", updated);
-    if (!localStorage.getItem("offlineMode") && typeof SyncService !== "undefined") await SyncService.syncData();
+    if (!sessionStorage.getItem("offlineMode") && typeof SyncService !== "undefined") await SyncService.syncData();
     this.currentShare = null;
     this.showLoanList();
     this.showLoanDetail(updated.length - 1);
@@ -2449,7 +2506,7 @@ const UIHandler = {
   },
   /** Show security prompt: 2FA-only when they have recovery but no 2FA (emphasize securing account); combined (2FA + recovery) when they have neither. Never show if they already have 2FA. "Maybe later" re-shows after 7 days. */
   async maybeShowSecurityPrompt() {
-    if (localStorage.getItem("offlineMode")) return;
+    if (sessionStorage.getItem("offlineMode")) return;
     const user = await AuthService.getUser();
     if (!user || !user.email) return;
     const factors = await AuthService.mfaListFactors();
@@ -2554,7 +2611,7 @@ const UIHandler = {
   async checkTransferOffers() {
     const banner = document.getElementById("transfer-offer-banner");
     if (!banner) return;
-    if (localStorage.getItem("offlineMode")) { banner.style.display = "none"; return; }
+    if (sessionStorage.getItem("offlineMode")) { banner.style.display = "none"; return; }
     const result = await ShareService.listTransferOffers();
     const offers = result.offers || [];
     if (offers.length === 0) {
@@ -2605,7 +2662,7 @@ const UIHandler = {
   async checkEditRequests() {
     const banner = document.getElementById("edit-request-banner");
     if (!banner) return;
-    if (localStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+    if (sessionStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
     const result = await ShareService.listMyShares();
     const shares = (result.shares || []).filter(s => s.edit_requested_at);
     if (shares.length === 0) {
@@ -2658,7 +2715,7 @@ const UIHandler = {
   async checkEditResolutionBanner() {
     const banner = document.getElementById("edit-resolution-banner");
     if (!banner) return;
-    if (localStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+    if (sessionStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
     const result = await ShareService.listSharesReceived();
     const unseen = (result.shares || []).filter(s => s.edit_request_resolved_at && !s.recipient_seen_resolution_at);
     if (unseen.length === 0) {
@@ -2693,45 +2750,68 @@ const UIHandler = {
   },
   async populateShareActiveList() {
     const loanIndex = this.shareLoanIndex;
-    const section = document.getElementById("share-active-list-section");
-    const listEl = document.getElementById("share-active-list");
-    if (!section || !listEl) return;
+    const linksSection = document.getElementById("share-active-links-section");
+    const sharesSection = document.getElementById("share-active-shares-section");
+    const linksList = document.getElementById("share-active-links");
+    const sharesList = document.getElementById("share-active-shares");
+    if (!linksSection || !sharesSection || !linksList || !sharesList) return;
     if (loanIndex == null) {
-      section.style.display = "none";
+      linksSection.classList.add("hidden");
+      sharesSection.classList.add("hidden");
       return;
     }
     const loans = StorageService.load("loanData") || [];
     const loan = loans[loanIndex];
     if (!loan || loan.id == null) {
-      section.style.display = "none";
+      linksSection.classList.add("hidden");
+      sharesSection.classList.add("hidden");
       return;
     }
     const loanId = String(loan.id);
     const result = await ShareService.listMyShares();
-    const shares = (result.shares || []).filter(s => String(s.loan_id) === loanId);
-    section.style.display = shares.length ? "block" : "none";
-    if (shares.length === 0) {
-      listEl.innerHTML = "";
-      return;
-    }
-    listEl.innerHTML = shares.map(s => {
+    const allShares = (result.shares || []).filter(s => String(s.loan_id) === loanId);
+    const unredeemed = allShares.filter(s => !s.used_at);
+    const redeemed = allShares.filter(s => !!s.used_at);
+
+    const baseUrl = window.location.origin + window.location.pathname;
+
+    linksSection.style.display = unredeemed.length ? "block" : "none";
+    linksSection.classList.toggle("hidden", !unredeemed.length);
+    linksList.innerHTML = unredeemed.map(s => {
       const expiresAt = s.expires_at ? new Date(s.expires_at) : null;
       const expired = expiresAt && expiresAt < new Date();
       const expiresStr = expiresAt ? UIHandler.formatDate(expiresAt.toISOString().slice(0, 10)) : "";
       const permLabel = s.permission === "edit" ? LanguageService.translate("shareCanEdit") : LanguageService.translate("shareViewOnly");
       const viewLabel = s.recipient_view === "lending" ? LanguageService.translate("shareLending") : LanguageService.translate("shareBorrowing");
-      const recipientLine = s.used_at
-        ? " · " + LanguageService.translate("sharedWith") + ": " + escapeHtml(((s.recipient_display_name && s.recipient_display_name.trim()) || (s.recipient_email || "").trim() || LanguageService.translate("signedInUser")))
-        : " · " + LanguageService.translate("linkNotUsedYet");
       const expiredLabel = expired ? " (" + LanguageService.translate("shareExpired") + ")" : "";
+      const shareUrl = `${baseUrl}?share=${encodeURIComponent(s.token)}`;
+      return `
+        <div class="share-active-item" data-share-id="${s.id}">
+          <div class="share-active-item-meta">
+            ${escapeHtml(permLabel)} · ${escapeHtml(viewLabel)} · ${LanguageService.translate("linkExpiresOn")}: ${expiresStr}${expiredLabel}
+          </div>
+          <div class="share-active-item-actions">
+            <button type="button" class="btn-primary share-copy-link-btn" data-share-url="${escapeHtml(shareUrl)}" title="${escapeHtml(LanguageService.translate("copyLink"))}">${LanguageService.translate("copyLink")}</button>
+            <button type="button" class="btn-delete share-revoke-btn" data-share-id="${s.id}">${LanguageService.translate("revokeShare")}</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    sharesSection.style.display = redeemed.length ? "block" : "none";
+    sharesSection.classList.toggle("hidden", !redeemed.length);
+    sharesList.innerHTML = redeemed.map(s => {
+      const permLabel = s.permission === "edit" ? LanguageService.translate("shareCanEdit") : LanguageService.translate("shareViewOnly");
+      const viewLabel = s.recipient_view === "lending" ? LanguageService.translate("shareLending") : LanguageService.translate("shareBorrowing");
+      const recipientLine = LanguageService.translate("sharedWith") + ": " + escapeHtml(((s.recipient_display_name && s.recipient_display_name.trim()) || (s.recipient_email || "").trim() || LanguageService.translate("signedInUser")));
       const transferPending = s.transfer_requested_at ? " · " + LanguageService.translate("transferPending") : "";
-      const showTransferBtn = s.used_at && !s.transfer_requested_at;
-      const showCancelTransferBtn = s.used_at && s.transfer_requested_at;
+      const showTransferBtn = !s.transfer_requested_at;
+      const showCancelTransferBtn = !!s.transfer_requested_at;
       const editRequested = !!s.edit_requested_at;
       return `
         <div class="share-active-item" data-share-id="${s.id}">
           <div class="share-active-item-meta">
-            ${escapeHtml(permLabel)} · ${escapeHtml(viewLabel)} · ${LanguageService.translate("shareExpiresOn")}: ${expiresStr}${recipientLine}${transferPending}${expiredLabel}
+            ${escapeHtml(permLabel)} · ${escapeHtml(viewLabel)} · ${recipientLine}${transferPending}
             ${editRequested ? "<br><strong>" + (LanguageService.translate("editRequestedByRecipient") || "Recipient requested edit access.") + "</strong>" : ""}
           </div>
           <div class="share-active-item-actions">
@@ -2747,33 +2827,18 @@ const UIHandler = {
         </div>
       `;
     }).join("");
-    listEl.querySelectorAll(".share-edit-approve-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-share-id");
-        if (!id) return;
-        const r = await ShareService.approveEditRequest(id);
-        if (r.error) UIHandler.showFeedback(r.error);
-        else {
-          UIHandler.showFeedback(LanguageService.translate("editRequestApproved"));
-          UIHandler.populateShareActiveList();
-          UIHandler.checkEditRequests();
-        }
+
+    linksList.querySelectorAll(".share-copy-link-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const url = btn.getAttribute("data-share-url");
+        if (!url) return;
+        try {
+          navigator.clipboard.writeText(url);
+          UIHandler.showFeedback(LanguageService.translate("copied"));
+        } catch (_) {}
       });
     });
-    listEl.querySelectorAll(".share-edit-decline-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-share-id");
-        if (!id) return;
-        const r = await ShareService.declineEditRequest(id);
-        if (r.error) UIHandler.showFeedback(r.error);
-        else {
-          UIHandler.showFeedback(LanguageService.translate("editRequestDeclined"));
-          UIHandler.populateShareActiveList();
-          UIHandler.checkEditRequests();
-        }
-      });
-    });
-    listEl.querySelectorAll(".share-revoke-btn").forEach(btn => {
+    linksList.querySelectorAll(".share-revoke-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-share-id");
         if (!id) return;
@@ -2789,7 +2854,50 @@ const UIHandler = {
         });
       });
     });
-    listEl.querySelectorAll(".share-transfer-btn").forEach(btn => {
+
+    sharesList.querySelectorAll(".share-edit-approve-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-share-id");
+        if (!id) return;
+        const r = await ShareService.approveEditRequest(id);
+        if (r.error) UIHandler.showFeedback(r.error);
+        else {
+          UIHandler.showFeedback(LanguageService.translate("editRequestApproved"));
+          UIHandler.populateShareActiveList();
+          UIHandler.checkEditRequests();
+        }
+      });
+    });
+    sharesList.querySelectorAll(".share-edit-decline-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-share-id");
+        if (!id) return;
+        const r = await ShareService.declineEditRequest(id);
+        if (r.error) UIHandler.showFeedback(r.error);
+        else {
+          UIHandler.showFeedback(LanguageService.translate("editRequestDeclined"));
+          UIHandler.populateShareActiveList();
+          UIHandler.checkEditRequests();
+        }
+      });
+    });
+    sharesList.querySelectorAll(".share-revoke-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-share-id");
+        if (!id) return;
+        UIHandler.showConfirmModal({
+          title: LanguageService.translate("revokeShare") + "?",
+          confirmLabel: LanguageService.translate("revokeShare"),
+          confirmClass: "btn-delete",
+          onConfirm: async () => {
+            const r = await ShareService.revokeShare(id);
+            if (r.error) UIHandler.showFeedback(r.error);
+            else UIHandler.populateShareActiveList();
+          }
+        });
+      });
+    });
+    sharesList.querySelectorAll(".share-transfer-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-share-id");
         if (!id) return;
@@ -2808,7 +2916,7 @@ const UIHandler = {
         });
       });
     });
-    listEl.querySelectorAll(".share-cancel-transfer-btn").forEach(btn => {
+    sharesList.querySelectorAll(".share-cancel-transfer-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-share-id");
         if (!id) return;
@@ -2817,7 +2925,7 @@ const UIHandler = {
         else UIHandler.populateShareActiveList();
       });
     });
-    listEl.querySelectorAll(".share-permission-select").forEach(sel => {
+    sharesList.querySelectorAll(".share-permission-select").forEach(sel => {
       sel.addEventListener("change", async () => {
         const id = sel.getAttribute("data-share-id");
         const permission = sel.value;
@@ -3154,7 +3262,7 @@ const FormHandler = {
     copy.name = (LanguageService.translate("copyOf") || "Copy of {name}").replace(/\{name\}/g, source.name || "");
     loans.push(copy);
     StorageService.save("loanData", loans);
-    if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+    if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
     UIHandler.renderLoans();
     UIHandler.showFeedback(LanguageService.translate("loanDuplicated"));
   },
@@ -3351,7 +3459,7 @@ const FormHandler = {
       UIHandler.showFeedback(LanguageService.translate("loanSaved"));
     }
     StorageService.save("loanData", all);
-    if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+    if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
     UIHandler.closeModal("loan-modal");
     UIHandler.renderLoans();
     if (idx === null) setTimeout(() => UIHandler.maybeShowSecurityPrompt(), 600);
@@ -3559,7 +3667,7 @@ const FormHandler = {
       UIHandler.showFeedback(LanguageService.translate("amortizationSaved"));
     }
     StorageService.save("loanData", ld);
-    if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+    if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
     UIHandler.closeModal("amortization-modal");
     UIHandler.renderLoans();
   }
@@ -3692,7 +3800,7 @@ const ConfirmHandler = {
     if (type === "loan") {
       all.splice(loanIndex, 1);
       StorageService.save("loanData", all);
-      if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+      if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
       if (UIHandler.currentDetailLoanIndex !== null && loanIndex === UIHandler.currentDetailLoanIndex) {
         UIHandler.showLoanList();
       } else {
@@ -3703,7 +3811,7 @@ const ConfirmHandler = {
     } else if (type === "amortization") {
       all[loanIndex].payments.splice(paymentIndex, 1);
       StorageService.save("loanData", all);
-      if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+      if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
       UIHandler.renderLoans();
       UIHandler.showFeedback(LanguageService.translate("amortizationRemoved"));
       UIHandler.closeModal("amortization-modal");
@@ -3734,7 +3842,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const url = window.location.origin + window.location.pathname;
     let updateModalShown = false;
     function checkNewVersion() {
-      if (localStorage.getItem("offlineMode") || updateModalShown) return;
+      if (sessionStorage.getItem("offlineMode") || updateModalShown) return;
       fetch(url + "?_v=" + Date.now(), { cache: "no-store" })
         .then((r) => r.text())
         .then((html) => {
@@ -3784,15 +3892,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loginModal = document.getElementById("login-modal");
   const loginCloseBtn = loginModal.querySelector(".btn-close");
   loginCloseBtn.addEventListener("click", () => {
-    localStorage.setItem("offlineMode", "true");
     loginModal.style.display = "none";
     UIHandler.restoreBodyScroll();
-    UIHandler.sharesReceived = [];
-    UIHandler.init();
     showLoginPane();
+    updateUserHeader();
   });
   let needMfaChallenge = false;
-  if (!localStorage.getItem("offlineMode")) {
+  const referrer = document.referrer || "";
+  const cameFromStartPage = !referrer || referrer.includes("index.html") || referrer.replace(/\/$/, "") === window.location.origin;
+  if (cameFromStartPage) sessionStorage.removeItem("offlineMode");
+  if (!sessionStorage.getItem("offlineMode")) {
     const user = await AuthService.getUser();
     if (!user) {
       const shareLanding = document.getElementById("login-share-landing");
@@ -3881,11 +3990,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   const profileIconBtn = document.getElementById("profile-icon-btn");
   const profileDropdown = document.getElementById("profile-dropdown");
+  const userHeaderBlock = document.getElementById("user-header-block");
   if (profileIconBtn && profileDropdown) {
     profileIconBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      profileDropdown.classList.toggle("open");
-      profileIconBtn.setAttribute("aria-expanded", profileDropdown.classList.contains("open"));
+      if (userHeaderBlock && userHeaderBlock.classList.contains("signed-out")) {
+        showLoginPane();
+        document.getElementById("login-modal").style.display = "flex";
+        document.body.style.overflow = "hidden";
+      } else {
+        profileDropdown.classList.toggle("open");
+        profileIconBtn.setAttribute("aria-expanded", profileDropdown.classList.contains("open"));
+      }
     });
     document.addEventListener("click", () => {
       profileDropdown.classList.remove("open");
@@ -3895,7 +4011,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("profile-logout").addEventListener("click", async () => {
     profileDropdown.classList.remove("open");
     await AuthService.signOut();
-    localStorage.removeItem("offlineMode");
+    sessionStorage.removeItem("offlineMode");
     StorageService.save("loanData", []);
     location.reload();
   });
@@ -4143,7 +4259,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       loan = { ...loan, id: crypto.randomUUID() };
       loans[loanIndex] = loan;
       StorageService.save("loanData", loans);
-      if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+      if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
     }
     const permission = document.querySelector("#share-loan-modal input[name=share-permission]:checked")?.value || "view";
     const recipientView = document.querySelector("#share-loan-modal input[name=share-recipient-view]:checked")?.value || "borrowing";
@@ -4247,7 +4363,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     await AuthService.signOut();
-    localStorage.removeItem("offlineMode");
+    sessionStorage.removeItem("offlineMode");
     UIHandler.closeModal("delete-account-modal");
     location.reload();
   });
@@ -4762,7 +4878,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   });
               }
               StorageService.save("loanData", current);
-              if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+              if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
               UIHandler.renderLoans();
               UIHandler.showFeedback(LanguageService.translate("dataImported"));
               UIHandler.closeModal("settings-modal");
@@ -4792,7 +4908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             else current.push(l);
           });
           StorageService.save("loanData", current);
-          if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+          if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
           UIHandler.renderLoans();
           UIHandler.showFeedback(LanguageService.translate("dataImported"));
           UIHandler.closeModal("settings-modal");
@@ -4817,7 +4933,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Listen for coming online to trigger a sync
   window.addEventListener("online", async () => {
-    if (!localStorage.getItem("offlineMode")) await SyncService.syncData();
+    if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
   });
 });
 
@@ -4838,12 +4954,8 @@ async function tryRedeemPendingShare() {
     UIHandler.showSharedLoan();
   }
 }
-async function onLoginSuccess() {
-  document.getElementById("login-modal").style.display = "none";
-  UIHandler.restoreBodyScroll();
-  localStorage.removeItem("offlineMode");
-  const syncedData = await SyncService.loadData();
-  StorageService.save("loanData", syncedData ?? []);
+async function finishLoginSuccess(loanDataToUse) {
+  StorageService.save("loanData", loanDataToUse ?? []);
   const { shares: sharesReceived } = await ShareService.listSharesReceived();
   UIHandler.sharesReceived = sharesReceived || [];
   UIHandler.init();
@@ -4853,6 +4965,39 @@ async function onLoginSuccess() {
   UIHandler.checkTransferOffers();
   UIHandler.checkEditRequests();
   UIHandler.checkEditResolutionBanner();
+}
+
+async function onLoginSuccess() {
+  document.getElementById("login-modal").style.display = "none";
+  UIHandler.restoreBodyScroll();
+  sessionStorage.removeItem("offlineMode");
+  const localLoans = StorageService.load("loanData") || [];
+  const syncedData = await SyncService.loadData();
+  const serverEmpty = !syncedData || syncedData.length === 0;
+  if (localLoans.length > 0 && serverEmpty) {
+    const n = localLoans.length;
+    const msg = (LanguageService.translate("localLoansAddToAccountMessage") || "You have {n} loan(s) on this device that aren't in your account. Add them to your account?")
+      .replace("{n}", String(n));
+    UIHandler.showConfirmModal({
+      title: LanguageService.translate("localLoansAddToAccountTitle") || "Add device loans to your account?",
+      message: msg,
+      confirmLabel: LanguageService.translate("addToMyAccount") || "Add to my account",
+      cancelLabel: LanguageService.translate("discardUseAccount") || "Discard and use account",
+      confirmClass: "btn-primary",
+      onConfirm: async () => {
+        UIHandler.cancelGenericConfirm();
+        await SyncService.syncData();
+        const after = await SyncService.loadData();
+        await finishLoginSuccess(after);
+      },
+      onCancel: async () => {
+        UIHandler.cancelGenericConfirm();
+        await finishLoginSuccess(syncedData ?? []);
+      }
+    });
+    return;
+  }
+  await finishLoginSuccess(syncedData ?? []);
 }
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -4929,16 +5074,23 @@ document.getElementById("mfa-challenge-close")?.addEventListener("click", async 
 });
 
 document.getElementById("work-offline-btn").addEventListener("click", () => {
-  localStorage.setItem("offlineMode", "true");
+  sessionStorage.setItem("offlineMode", "true");
   document.getElementById("login-modal").style.display = "none";
   UIHandler.restoreBodyScroll();
   LanguageService.init();
   UIHandler.sharesReceived = [];
   UIHandler.init();
+  updateUserHeader();
   updateOfflineBanner();
 });
 
 document.getElementById("offline-banner-signin-btn").addEventListener("click", () => {
+  showLoginPane();
+  document.getElementById("login-modal").style.display = "flex";
+  document.body.style.overflow = "hidden";
+});
+
+document.getElementById("save-to-account-btn")?.addEventListener("click", () => {
   showLoginPane();
   document.getElementById("login-modal").style.display = "flex";
   document.body.style.overflow = "hidden";
@@ -4982,7 +5134,14 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
     : undefined;
   const result = await AuthService.signUp(email, password, displayName, emailRedirectTo);
   if (result.success) {
-    feedback.textContent = LanguageService.translate("signUpSuccess");
+    const localLoans = StorageService.load("loanData") || [];
+    const n = localLoans.length;
+    let msg = LanguageService.translate("signUpSuccess");
+    if (n > 0) {
+      const returnMsg = (LanguageService.translate("signUpSuccessReturnToSave") || "Return to this page after confirming your email to sign in and save your {n} loan(s) to your account.").replace("{n}", String(n));
+      msg += "\n\n" + returnMsg;
+    }
+    feedback.textContent = msg;
     feedback.className = "success";
     document.getElementById("signup-form").reset();
   } else {

@@ -691,6 +691,32 @@ th, td {
   margin-bottom: 20px;
 }
 .list-summary:empty { display: none; }
+
+.save-to-account-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--input-background);
+  border: 1px solid var(--primary-color);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.save-to-account-bar.hidden { display: none; }
+.save-to-account-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+.save-to-account-btn {
+  flex-shrink: 0;
+  min-width: auto;
+}
+
 .list-summary-card {
   background: var(--input-background);
   border: 1px solid var(--input-border);
@@ -1421,26 +1447,66 @@ th, td {
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 6px;
+  white-space: pre-line;
   font-size: 13px;
   background: rgba(217, 83, 79, 0.12);
   color: var(--button-delete);
+  white-space: pre-line;
 }
 #login-modal #login-feedback.success {
   background: rgba(40, 167, 69, 0.12);
   color: #2d9d4a;
+}
+#login-modal .signup-return-hint {
+  margin-top: 10px;
+  font-size: 0.85rem;
 }
 
 /* =============================
    PROFILE DROPDOWN (user menu)
 ============================= */
 .user-header-block {
-  display: none;
-  position: relative;
-  align-items: center;
-}
-.user-header-block.visible {
   display: flex;
+  align-items: center;
+  position: relative;
+  gap: 6px;
 }
+.user-header-block .signed-out-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--button-delete);
+  white-space: nowrap;
+}
+.user-header-block .signed-out-label.hidden {
+  display: none;
+}
+.user-header-block.signed-out .profile-icon-btn .profile-icon-img {
+  color: var(--button-delete);
+}
+.header-status-tooltip {
+  visibility: hidden;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  padding: 8px 12px;
+  max-width: 260px;
+  background: var(--modal-content-background);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-color);
+  z-index: 1100;
+  white-space: normal;
+  pointer-events: none;
+}
+.user-header-block.signed-out:hover .header-status-tooltip {
+  visibility: visible;
+}
+
 .profile-icon-btn {
   background: none;
   border: none;
@@ -1453,7 +1519,8 @@ th, td {
 .profile-icon-btn:hover {
   background: var(--input-background);
 }
-.profile-icon-btn .material-icons {
+.profile-icon-btn .material-icons,
+.profile-icon-btn .profile-icon-img {
   font-size: 24px;
 }
 .profile-dropdown {
@@ -1532,9 +1599,37 @@ th, td {
 #change-password-feedback.error { color: var(--button-delete); }
 #change-password-feedback.success { color: #2d9d4a; }
 
-/* Account modal */
+/* Account modal: tighter layout, clear sections */
 #account-modal .modal-content {
-  max-width: 480px;
+  max-width: 460px;
+  padding: 18px 22px;
+}
+#account-modal .modal-main-title {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  font-size: 1.15rem;
+}
+#account-modal .modal-section,
+#account-modal #account-settings-section {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+#account-modal .account-subtitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  padding-bottom: 2px;
+  color: var(--primary-color);
+  border-bottom: 1px solid var(--input-border);
+}
+#account-modal .account-subtitle:not(:first-child) {
+  margin-top: 14px;
+}
+#account-modal .account-field-help {
+  font-size: 0.8rem;
+  margin: 4px 0 0 0;
+  color: var(--text-color);
+  opacity: 0.85;
 }
 .account-subtitle {
   font-size: 14px;
@@ -1638,8 +1733,30 @@ th, td {
 .account-security-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+}
+.account-security-label {
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+#account-modal .account-change-password-btn {
+  flex-shrink: 0;
+  min-width: auto;
+  padding: 6px 14px;
+  font-size: 0.875rem;
+}
+#account-modal .account-mfa-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+#account-modal .account-mfa-enable,
+#account-modal .account-mfa-disable {
+  min-width: auto;
+  padding: 6px 14px;
+  font-size: 0.875rem;
 }
 .account-security-label { flex: 1; font-size: 14px; }
 .account-export-data-btn { margin-right: 10px; margin-bottom: 8px; }
@@ -1652,21 +1769,66 @@ th, td {
 }
 .delete-account-confirm { font-size: 13px; margin: 0 0 14px 0; }
 #delete-account-modal .modal-content { max-width: 440px; }
+
+/* Share loan modal: balanced density (readable font, tighter padding) */
+#share-loan-modal .modal-content { max-width: 520px; padding: 20px 24px; }
+#share-loan-modal .modal-main-title { margin-bottom: 12px; padding-bottom: 10px; font-size: 1.2rem; }
+#share-loan-modal .account-field-help {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  margin: 0 0 14px 0;
+  color: var(--text-color);
+  opacity: 0.9;
+}
+#share-loan-modal .share-display-name-hint { margin-bottom: 16px; }
+#share-loan-modal .modal-section {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+#share-loan-modal .modal-section-subtitle {
+  font-size: 0.9375rem;
+  margin: 0 0 6px 0;
+  padding-bottom: 4px;
+}
+#share-loan-modal .share-options label {
+  font-size: 0.9375rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 16px;
+  margin-bottom: 6px;
+}
+#share-loan-modal select {
+  font-size: 0.9375rem;
+  padding: 8px 10px;
+  max-width: 200px;
+}
 .share-options label { display: inline-flex; align-items: center; gap: 6px; margin-right: 16px; margin-bottom: 8px; }
-.share-link-result { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--input-border); }
+.share-link-result { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--input-border); }
 .share-link-input-wrap { display: flex; gap: 8px; margin: 8px 0; align-items: center; }
-.share-link-input { flex: 1; min-width: 0; }
-.share-active-list-section { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--input-border); }
-.share-active-list { max-height: 200px; overflow-y: auto; }
+.share-link-input { flex: 1; min-width: 0; font-size: 0.9rem; }
+.share-active-list-section { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--input-border); }
+.share-active-list-section:last-of-type { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.share-active-list-section .modal-section-subtitle { margin-bottom: 8px; }
+.share-active-list { max-height: 220px; overflow-y: auto; }
 .share-active-item {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  padding: 10px 12px; margin-bottom: 8px; background: var(--input-background);
-  border: 1px solid var(--input-border); border-radius: 4px; font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--input-background);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 .share-active-item-meta { flex: 1; min-width: 0; }
 .share-active-item-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.share-active-item select { padding: 4px 8px; font-size: 12px; }
-#share-loan-modal select { max-width: 200px; }
+.share-active-item select { padding: 6px 10px; font-size: 0.875rem; }
+#share-loan-modal .share-active-list .share-active-item select { max-width: 200px; }
+.share-active-item .share-copy-link-btn { min-width: auto; }
 .shared-by-line {
   font-size: 0.875rem;
   color: var(--text-color);
