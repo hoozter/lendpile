@@ -1,6 +1,6 @@
 # Lendpile
 
-**Version 0.2.0**
+**Version 0.2.1**
 
 A clear, reliable loan and amortization tracker. Plan loans you borrow or lend, see schedules and charts, and optionally sign in with an account to keep your data in sync. By [hoozter](https://hoozter.com). Designed in Sweden. Free to use.
 

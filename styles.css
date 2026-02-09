@@ -585,20 +585,15 @@ span.btn-close:hover { background-color: var(--input-border); }
   width: 100%;
   border-radius: 5px;
 }
-.table-header-wrapper {
-  flex-shrink: 0;
-  width: 100%;
-  border-radius: 5px 5px 0 0;
-  overflow: hidden;
-}
-.table-header-wrapper .amortization-table {
-  border-radius: 5px 5px 0 0;
+.table-container.table-compact { height: auto; }
+.table-container.table-compact .table-body-scroll {
+  max-height: none;
 }
 .table-body-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
@@ -616,19 +611,16 @@ th, td {
   border-bottom: 1px solid var(--input-border);
   height: 40px;
 }
-.table-header-wrapper th {
+.loan-detail-amortizations .amortization-table thead th,
+.amortization-table thead th {
   background-color: var(--input-background);
   color: var(--text-color);
   font-weight: 600;
   font-size: 0.9rem;
   border-bottom: 2px solid var(--input-border);
-}
-.loan-detail-amortizations .amortization-table thead th {
-  background-color: var(--input-background);
-  color: var(--text-color);
-  font-weight: 600;
-  font-size: 0.9rem;
-  border-bottom: 2px solid var(--input-border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .amortization-table { table-layout: fixed; }
 .amortization-table th:nth-child(1),
@@ -1259,9 +1251,85 @@ th, td {
 /* =============================
    RESPONSIVE & PRINT
 ============================= */
-@media (max-width: 768px) {
-  .container { padding: 15px; }
-  .modal-content { width: 95%; margin: 5vh auto; padding: 20px; }
+@media (max-width: 980px) {
+  .container { padding: 22px; }
+  .header-content { padding: 0 20px; }
+}
+@media (max-width: 720px) {
+  body { padding: 12px; }
+  .container { padding: 16px; border-radius: 10px; }
+  .main-header { padding: 12px 0; margin-bottom: 16px; }
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 0 12px;
+  }
+  .logo-container { margin: 6px 0; }
+  .logo { height: 42px; }
+  .controls-right {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .theme-control { padding: 4px 8px; }
+  .modal-content { width: 95%; margin: 4vh auto; padding: 20px; }
+  .modal-section { padding: 14px; margin-bottom: 14px; }
+
+  .loan-info-header { flex-direction: column; align-items: stretch; }
+  .loan-info-header h2 { text-align: left; }
+  #add-loan-btn { width: 100%; }
+  .loan-card-compact { align-items: flex-start; }
+  .loan-card-compact-meta { gap: 8px; }
+  .loan-card-compact-actions { width: 100%; justify-content: flex-end; }
+
+  .loan-detail-header h2 { flex-basis: 100%; font-size: 1.2rem; }
+  .loan-detail-header-spacer { display: none; }
+  .loan-detail-tabs {
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: none;
+  }
+  .loan-detail-tab {
+    flex: 1 1 45%;
+    text-align: center;
+    padding: 10px 10px;
+    font-size: 0.9rem;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    margin-bottom: 0;
+  }
+  .loan-detail-tab.active {
+    background: rgba(0, 161, 255, 0.12);
+    border-color: var(--primary-color);
+  }
+
+  .table-container { height: auto; }
+  .table-body-scroll { max-height: 60vh; overflow-x: auto; }
+  .amortization-table { min-width: 680px; }
+
+  .overview-summary { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .overview-cards { grid-template-columns: 1fr; }
+  #loan-detail-chart-container { height: 260px; min-height: 220px; }
+
+  .change-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .change-item-details { flex-direction: column; gap: 6px; }
+  .change-item-actions { width: 100%; justify-content: flex-end; }
+  .payment-plans-header { justify-content: flex-start; }
+
+  .account-row-align { flex-direction: column; align-items: stretch; }
+  .account-row-align input { max-width: 100%; }
+  .account-security-row { flex-direction: column; align-items: flex-start; }
+  #account-modal .account-mfa-actions { width: 100%; flex-wrap: wrap; }
+
+  .share-link-input-wrap { flex-direction: column; align-items: stretch; }
+  .share-active-item-actions { width: 100%; }
+
+  .offline-banner { flex-direction: column; align-items: flex-start; }
+  .offline-banner-btn { width: 100%; }
+
+  #login-modal .modal-content { padding: 24px 20px; }
 }
 @media print {
   body { padding: 0; background: white; }

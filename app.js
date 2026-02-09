@@ -2433,7 +2433,7 @@ const UIHandler = {
     const forecastCount = forecast.length;
     return `
       <div class="table-container">
-        <div class="table-header-wrapper">
+        <div class="table-body-scroll">
           <table class="amortization-table">
             <thead>
               <tr>
@@ -2446,10 +2446,6 @@ const UIHandler = {
                 <th>${LanguageService.translate("interestRate")}</th>
               </tr>
             </thead>
-          </table>
-        </div>
-        <div class="table-body-scroll">
-          <table class="amortization-table">
             <tbody>
               ${timeline.map((row, i) => UIHandler.createTimelineRow(row, i, timeline, forecastCount, historicalCount, currency)).join("")}
             </tbody>
@@ -2522,23 +2518,25 @@ const UIHandler = {
     return `
       <div class="amortization-content">
         <div class="payment-plans-header">${addBtn}</div>
-        <div class="table-container">
-          <table class="amortization-table">
-            <thead>
-              <tr>
-                <th>${LanguageService.translate("amount")}</th>
-                <th>${LanguageService.translate("date")}</th>
-                <th>${LanguageService.translate("endDate")}</th>
-                <th>${LanguageService.translate("type")}</th>
-                <th>${LanguageService.translate("frequency")}</th>
-                <th>${LanguageService.translate("status")}</th>
-                <th>${LanguageService.translate("actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${loan.payments.map((payment, i) => UIHandler.createAmortRow(loan, payment, loanIndex, i, canEdit)).join("")}
-            </tbody>
-          </table>
+        <div class="table-container table-compact">
+          <div class="table-body-scroll">
+            <table class="amortization-table">
+              <thead>
+                <tr>
+                  <th>${LanguageService.translate("amount")}</th>
+                  <th>${LanguageService.translate("date")}</th>
+                  <th>${LanguageService.translate("endDate")}</th>
+                  <th>${LanguageService.translate("type")}</th>
+                  <th>${LanguageService.translate("frequency")}</th>
+                  <th>${LanguageService.translate("status")}</th>
+                  <th>${LanguageService.translate("actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${loan.payments.map((payment, i) => UIHandler.createAmortRow(loan, payment, loanIndex, i, canEdit)).join("")}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     `;
