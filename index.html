@@ -8,6 +8,64 @@
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Lendpile – a clear loan and amortization tracker. Plan what you borrow or lend, see schedules and charts. Optional account to sync your data when you sign in." />
   <title>Lendpile – Loan &amp; amortization tracker</title>
+  <script src="config.js"></script>
+  <script>
+    (() => {
+      const tokenKey = "lendpile_neon_token";
+      const appUrl = "app.html";
+
+      function base64UrlDecode(str) {
+        const normalized = String(str || "").replace(/-/g, "+").replace(/_/g, "/");
+        const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+        return atob(padded);
+      }
+
+      function decodeJwt(token) {
+        try {
+          const parts = String(token || "").split(".");
+          if (parts.length !== 3) return null;
+          return JSON.parse(base64UrlDecode(parts[1]));
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function hasValidStoredToken() {
+        try {
+          const token = localStorage.getItem(tokenKey);
+          const payload = decodeJwt(token);
+          return Boolean(token && payload?.sub && (!payload.exp || Math.floor(Date.now() / 1000) < payload.exp));
+        } catch (_) {
+          return false;
+        }
+      }
+
+      async function hasActiveNeonSession() {
+        const neonAuthUrl = (window.NEON_AUTH_URL || "").replace(/\/$/, "");
+        if (!neonAuthUrl) return false;
+
+        try {
+          const res = await fetch(`${neonAuthUrl}/get-session`, { method: "GET", credentials: "include" });
+          const body = (await res.json().catch(() => ({}))) || {};
+          const jwt = res.headers.get("set-auth-jwt");
+          if (!res.ok || !body?.user || !jwt) return false;
+          localStorage.setItem(tokenKey, jwt);
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      if (hasValidStoredToken()) {
+        window.location.replace(appUrl);
+        return;
+      }
+
+      hasActiveNeonSession().then((isSignedIn) => {
+        if (isSignedIn) window.location.replace(appUrl);
+      });
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=League+Spartan:wght@500;600&display=swap" rel="stylesheet" />
