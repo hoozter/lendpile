@@ -5,6 +5,8 @@ const root = path.resolve(import.meta.dirname, "..");
 const outDir = path.join(root, "dist");
 
 const files = [
+  "404.html",
+  "_redirects",
   "admin.html",
   "app.html",
   "app.js",
