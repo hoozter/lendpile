@@ -12,6 +12,7 @@
   <script>
     (() => {
       const tokenKey = "lendpile_neon_token";
+      const signedOutKey = "lendpile_signed_out";
       const appUrl = "app.html";
 
       function base64UrlDecode(str) {
@@ -32,6 +33,7 @@
 
       function hasValidStoredToken() {
         try {
+          if (localStorage.getItem(signedOutKey) === "true") return false;
           const token = localStorage.getItem(tokenKey);
           const payload = decodeJwt(token);
           return Boolean(token && payload?.sub && (!payload.exp || Math.floor(Date.now() / 1000) < payload.exp));
@@ -45,6 +47,7 @@
         if (!neonAuthUrl) return false;
 
         try {
+          if (localStorage.getItem(signedOutKey) === "true") return false;
           const res = await fetch(`${neonAuthUrl}/get-session`, { method: "GET", credentials: "include" });
           const body = (await res.json().catch(() => ({}))) || {};
           const jwt = res.headers.get("set-auth-jwt");

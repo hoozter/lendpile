@@ -5,6 +5,7 @@ const LENDPILE_API_URL = (window.LENDPILE_API_URL || window.ADMIN_API_URL || "")
 const NEON_AUTH_URL = (window.NEON_AUTH_URL || "").replace(/\/$/, "");
 const LENDPILE_TOKEN_KEY = "lendpile_neon_token";
 const LENDPILE_PROFILE_KEY = "lendpile_profile_cache";
+const LENDPILE_SIGNED_OUT_KEY = "lendpile_signed_out";
 
 if (!LENDPILE_API_URL || !NEON_AUTH_URL) {
   console.error("Lendpile: Missing Neon config. Set LENDPILE_API_URL and NEON_AUTH_URL in config.js.");
@@ -18,6 +19,15 @@ function setStoredToken(token) {
 }
 function clearStoredToken() {
   try { localStorage.removeItem(LENDPILE_TOKEN_KEY); } catch (_) {}
+}
+function hasExplicitSignOut() {
+  try { return localStorage.getItem(LENDPILE_SIGNED_OUT_KEY) === "true"; } catch (_) { return false; }
+}
+function setExplicitSignOut() {
+  try { localStorage.setItem(LENDPILE_SIGNED_OUT_KEY, "true"); } catch (_) {}
+}
+function clearExplicitSignOut() {
+  try { localStorage.removeItem(LENDPILE_SIGNED_OUT_KEY); } catch (_) {}
 }
 function getCachedProfile() {
   try { return JSON.parse(localStorage.getItem(LENDPILE_PROFILE_KEY) || "{}"); } catch (_) { return {}; }
@@ -38,6 +48,7 @@ function decodeJwt(token) {
   } catch (_) { return null; }
 }
 function currentSessionFromToken() {
+  if (hasExplicitSignOut()) return null;
   const token = getStoredToken();
   const payload = decodeJwt(token);
   if (!token || !payload?.sub) return null;
@@ -55,6 +66,10 @@ function currentSessionFromToken() {
 }
 async function loadNeonSession() {
   if (!NEON_AUTH_URL) return { error: new Error("Neon Auth URL not configured"), data: null };
+  if (hasExplicitSignOut()) {
+    clearStoredToken();
+    return { error: new Error("Signed out"), data: null };
+  }
   const res = await fetch(`${NEON_AUTH_URL}/get-session`, { method: "GET", credentials: "include" });
   const body = (await res.json().catch(() => ({}))) || {};
   if (!res.ok || !body?.user) {
@@ -120,6 +135,7 @@ const AuthService = {
     });
     const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Login failed" };
+    clearExplicitSignOut();
     const session = await loadNeonSession();
     if (session.error) return { success: false, error: session.error.message };
     await this.refreshProfile();
@@ -135,6 +151,7 @@ const AuthService = {
     });
     const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Signup failed" };
+    clearExplicitSignOut();
     setCachedProfile({ display_name: displayName || "" });
     const session = await loadNeonSession();
     return { success: true, data: session.error ? { user: body.user || null, session: null, needsVerification: true } : session.data };
@@ -161,13 +178,24 @@ const AuthService = {
     });
     const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Could not verify email" };
+    clearExplicitSignOut();
     const session = await loadNeonSession();
     await this.refreshProfile();
     return { success: true, data: session.error ? body : session.data };
   },
   async signOut() {
+    setExplicitSignOut();
     clearStoredToken();
-    try { if (NEON_AUTH_URL) await fetch(`${NEON_AUTH_URL}/sign-out`, { method: "POST", credentials: "include" }); } catch (_) {}
+    try {
+      if (NEON_AUTH_URL) {
+        await fetch(`${NEON_AUTH_URL}/sign-out`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: "{}"
+        });
+      }
+    } catch (_) {}
   },
   async getUser() {
     const { data: { session } } = await getSession();

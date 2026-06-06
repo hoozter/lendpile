@@ -129,6 +129,7 @@
 
       const neonAuthUrl = (window.NEON_AUTH_URL || "").replace(/\/$/, "");
       const tokenKey = "lendpile_neon_token";
+      const signedOutKey = "lendpile_signed_out";
 
       var currentAuth = null; // { type: 'jwt'|'key', value: tokenOrKey }
 
@@ -269,8 +270,18 @@
       });
 
       logoutBtn.addEventListener("click", function () {
-        try { localStorage.removeItem(tokenKey); } catch (_) {}
-        if (neonAuthUrl) fetch(neonAuthUrl + "/sign-out", { method: "POST", credentials: "include" }).catch(function () {});
+        try {
+          localStorage.setItem(signedOutKey, "true");
+          localStorage.removeItem(tokenKey);
+        } catch (_) {}
+        if (neonAuthUrl) {
+          fetch(neonAuthUrl + "/sign-out", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: "{}"
+          }).catch(function () {});
+        }
         setLoggedOut();
         hideMessage();
       });
@@ -304,6 +315,7 @@
               loginForm.querySelector('button[type="submit"]').disabled = false;
               return;
             }
+            try { localStorage.removeItem(signedOutKey); } catch (_) {}
             return fetch(neonAuthUrl + "/get-session", { credentials: "include" })
               .then(function (sessionRes) {
                 return sessionRes.json().catch(function () { return {}; }).then(function (sessionBody) {
