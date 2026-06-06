@@ -1,9 +1,13 @@
-# Cloudflare Worker for Lendpile: user account deletion + admin API
-# Deploy: from this directory run: npx wrangler deploy
-# Set secrets: npx wrangler secret put SUPABASE_URL
-#             npx wrangler secret put SUPABASE_ANON_KEY
-#             npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-#             npx wrangler secret put ADMIN_SECRET
+# Cloudflare Worker for Lendpile: Neon Postgres API + admin API
+# Deploy: from this directory run: npm ci && npx wrangler deploy
+# Required secrets:
+#   npx wrangler secret put NEON_DATABASE_URL
+#   npx wrangler secret put NEON_AUTH_URL
+#   npx wrangler secret put NEON_AUTH_JWKS_URL
+# Optional:
+#   npx wrangler secret put LENDPILE_ADMIN_EMAILS
+#   npx wrangler secret put ADMIN_SECRET
+#   npx wrangler secret put ADMIN_TOTP_SECRET
 
 name = "lendpile-api"
 main = "src/index.js"

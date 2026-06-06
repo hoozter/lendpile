@@ -1,0 +1,8 @@
+{
+  "name": "lendpile",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "write-config": "node scripts/write-config.js"
+  }
+}

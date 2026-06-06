@@ -109,7 +109,6 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (function () {
       const STORAGE_KEY = "lendpile_admin_key";
@@ -128,9 +127,8 @@
       const tableWrap = document.getElementById("admin-table-wrap");
       const tbody = document.getElementById("admin-tbody");
 
-      const supabaseUrl = window.SUPABASE_URL;
-      const supabaseAnon = window.SUPABASE_ANON_KEY;
-      const supabase = (supabaseUrl && supabaseAnon) ? window.supabase.createClient(supabaseUrl, supabaseAnon) : null;
+      const neonAuthUrl = (window.NEON_AUTH_URL || "").replace(/\/$/, "");
+      const tokenKey = "lendpile_neon_token";
 
       var currentAuth = null; // { type: 'jwt'|'key', value: tokenOrKey }
 
@@ -140,7 +138,7 @@
       } catch (_) {}
 
       function getBaseUrl() {
-        var adminUrl = window.ADMIN_API_URL;
+        var adminUrl = window.ADMIN_API_URL || window.LENDPILE_API_URL;
         if (adminUrl) return adminUrl.replace(/\/$/, "");
         var deleteUrl = window.DELETE_ACCOUNT_URL;
         if (deleteUrl) return deleteUrl.replace(/\/delete-my-account\/?$/, "");
@@ -271,15 +269,16 @@
       });
 
       logoutBtn.addEventListener("click", function () {
-        if (supabase) supabase.auth.signOut();
+        try { localStorage.removeItem(tokenKey); } catch (_) {}
+        if (neonAuthUrl) fetch(neonAuthUrl + "/sign-out", { method: "POST", credentials: "include" }).catch(function () {});
         setLoggedOut();
         hideMessage();
       });
 
       loginForm.addEventListener("submit", function (e) {
         e.preventDefault();
-        if (!supabase) {
-          showMessage("Supabase config missing.", true);
+        if (!neonAuthUrl) {
+          showMessage("NEON_AUTH_URL config missing.", true);
           return;
         }
         var email = adminEmail.value.trim();
@@ -290,24 +289,40 @@
         }
         hideMessage();
         loginForm.querySelector('button[type="submit"]').disabled = true;
-        supabase.auth.signInWithPassword({ email: email, password: password })
+        fetch(neonAuthUrl + "/sign-in/email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email: email, password: password, rememberMe: true, callbackURL: window.location.pathname || "/admin.html" })
+        })
+          .then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (body) { return { res: res, body: body }; });
+          })
           .then(function (r) {
-            if (r.error) {
-              showMessage(r.error.message || "Login failed.", true);
+            if (!r.res.ok) {
+              showMessage(r.body.message || r.body.error || "Login failed.", true);
               loginForm.querySelector('button[type="submit"]').disabled = false;
               return;
             }
-            var token = r.data.session?.access_token;
-            if (!token) {
-              showMessage("Login failed.", true);
-              loginForm.querySelector('button[type="submit"]').disabled = false;
-              return;
-            }
-            currentAuth = { type: "jwt", value: token };
-            setLoggedIn(r.data.user?.email || email);
-            adminPassword.value = "";
-            loginForm.querySelector('button[type="submit"]').disabled = false;
-            loadUsers();
+            return fetch(neonAuthUrl + "/get-session", { credentials: "include" })
+              .then(function (sessionRes) {
+                return sessionRes.json().catch(function () { return {}; }).then(function (sessionBody) {
+                  return { token: sessionRes.headers.get("set-auth-jwt"), user: sessionBody.user };
+                });
+              })
+              .then(function (session) {
+                if (!session.token) {
+                  showMessage("Login succeeded, but no Neon JWT was issued.", true);
+                  loginForm.querySelector('button[type="submit"]').disabled = false;
+                  return;
+                }
+                try { localStorage.setItem(tokenKey, session.token); } catch (_) {}
+                currentAuth = { type: "jwt", value: session.token };
+                setLoggedIn((session.user && session.user.email) || email);
+                adminPassword.value = "";
+                loginForm.querySelector('button[type="submit"]').disabled = false;
+                loadUsers();
+              });
           })
           .catch(function (err) {
             showMessage(err.message || "Login failed.", true);
@@ -328,17 +343,16 @@
         loadUsers(function () { loadKeyBtn.disabled = false; });
       });
 
-      if (supabase) {
-        supabase.auth.getSession().then(function (r) {
-          var session = r.data.session;
-          var userEmail = r.data.user?.email || "";
-          if (session && session.access_token) {
-            currentAuth = { type: "jwt", value: session.access_token };
-            loadUsers(function (success) {
-              if (success) setLoggedIn(userEmail);
-            });
-          }
-        });
+      try {
+        var token = localStorage.getItem(tokenKey);
+        if (token) {
+          currentAuth = { type: "jwt", value: token };
+          loadUsers(function (success) {
+            if (success) setLoggedIn("Neon Auth user");
+            else currentAuth = null;
+          });
+        }
+      } catch (_) {
       }
     })();
   </script>

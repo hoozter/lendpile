@@ -4,7 +4,7 @@
  * Run: node scripts/generate-totp-secret.js
  * Add the output to your authenticator app and to the Worker secret ADMIN_TOTP_SECRET.
  */
-const crypto = require("crypto");
+import crypto from "node:crypto";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const bytes = crypto.randomBytes(20);
 let bits = 0;

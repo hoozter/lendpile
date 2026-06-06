@@ -1,5 +1,11 @@
-# Supabase config – contains secrets; never commit
+# Local config – may contain deployment URLs; do not commit
 config.js
+neonconnect.txt
+node_modules/
+worker/node_modules/
+.agents/
+.claude/
+skills-lock.json
 
 # Internal / dev-only (optional: remove these lines to commit them)
 docs/verify-campbell-loan.js

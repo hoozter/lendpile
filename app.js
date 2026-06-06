@@ -1,14 +1,99 @@
 /********************************************************
- * 0. SUPABASE & AUTH/SYNC SERVICES
+ * 0. NEON AUTH & WORKER SYNC SERVICES
  ********************************************************/
-const SUPABASE_URL = window.SUPABASE_URL;
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY;
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("Lendpile: Missing config. Copy config.example.js to config.js and add your Supabase URL and anon key.");
+const LENDPILE_API_URL = (window.LENDPILE_API_URL || window.ADMIN_API_URL || "").replace(/\/$/, "");
+const NEON_AUTH_URL = (window.NEON_AUTH_URL || "").replace(/\/$/, "");
+const LENDPILE_TOKEN_KEY = "lendpile_neon_token";
+const LENDPILE_PROFILE_KEY = "lendpile_profile_cache";
+
+if (!LENDPILE_API_URL || !NEON_AUTH_URL) {
+  console.error("Lendpile: Missing Neon config. Set LENDPILE_API_URL and NEON_AUTH_URL in config.js.");
 }
-const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY)
-  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
+
+function getStoredToken() {
+  try { return localStorage.getItem(LENDPILE_TOKEN_KEY); } catch (_) { return null; }
+}
+function setStoredToken(token) {
+  try { if (token) localStorage.setItem(LENDPILE_TOKEN_KEY, token); } catch (_) {}
+}
+function clearStoredToken() {
+  try { localStorage.removeItem(LENDPILE_TOKEN_KEY); } catch (_) {}
+}
+function getCachedProfile() {
+  try { return JSON.parse(localStorage.getItem(LENDPILE_PROFILE_KEY) || "{}"); } catch (_) { return {}; }
+}
+function setCachedProfile(profile) {
+  try { localStorage.setItem(LENDPILE_PROFILE_KEY, JSON.stringify(profile || {})); } catch (_) {}
+}
+function base64UrlDecode(str) {
+  const normalized = String(str || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  return atob(padded);
+}
+function decodeJwt(token) {
+  try {
+    const parts = String(token || "").split(".");
+    if (parts.length !== 3) return null;
+    return JSON.parse(base64UrlDecode(parts[1]));
+  } catch (_) { return null; }
+}
+function currentSessionFromToken() {
+  const token = getStoredToken();
+  const payload = decodeJwt(token);
+  if (!token || !payload?.sub) return null;
+  if (payload.exp && Math.floor(Date.now() / 1000) >= payload.exp) return null;
+  return {
+    access_token: token,
+    token_type: "bearer",
+    user: {
+      id: payload.sub,
+      email: payload.email || null,
+      user_metadata: getCachedProfile(),
+      app_metadata: {}
+    }
+  };
+}
+async function loadNeonSession() {
+  if (!NEON_AUTH_URL) return { error: new Error("Neon Auth URL not configured"), data: null };
+  const res = await fetch(`${NEON_AUTH_URL}/get-session`, { method: "GET", credentials: "include" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body?.user) {
+    clearStoredToken();
+    return { error: new Error(body.message || body.error || "No active auth session"), data: null };
+  }
+  const jwt = res.headers.get("set-auth-jwt");
+  if (!jwt) return { error: new Error("Neon Auth did not return a JWT"), data: null };
+  setStoredToken(jwt);
+  const profile = getCachedProfile();
+  if (body.user.name && !profile.display_name) {
+    profile.display_name = body.user.name;
+    setCachedProfile(profile);
+  }
+  return { data: { session: currentSessionFromToken(), user: currentSessionFromToken()?.user }, error: null };
+}
+async function apiFetch(path, options = {}) {
+  if (!LENDPILE_API_URL) throw new Error("Lendpile API URL not configured");
+  let session = currentSessionFromToken();
+  if (!session) {
+    await loadNeonSession().catch(() => null);
+    session = currentSessionFromToken();
+  }
+  const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+  const res = await fetch(`${LENDPILE_API_URL}${path}`, Object.assign({}, options, { headers, credentials: "include" }));
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || body.message || `Request failed (${res.status})`);
+  return body;
+}
+async function getSession() {
+  let session = currentSessionFromToken();
+  if (!session) {
+    const loaded = await loadNeonSession();
+    if (loaded.error) return { data: { session: null } };
+    session = currentSessionFromToken();
+  }
+  return { data: { session } };
+}
 
 /** Escape user-controlled text for safe use in HTML (prevents XSS when interpolating into innerHTML). */
 function escapeHtml(str) {
@@ -25,100 +110,143 @@ function escapeHtml(str) {
 /** Auth and user profile (display name, recovery email, MFA) */
 const AuthService = {
   async signIn(email, password) {
-    if (!supabaseClient) return { success: false, error: "Supabase not configured. Copy config.example.js to config.js." };
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) return { success: false, error: error.message };
-    return { success: true, data };
+    if (!NEON_AUTH_URL) return { success: false, error: "Neon Auth not configured. Set NEON_AUTH_URL in config.js." };
+    const res = await fetch(`${NEON_AUTH_URL}/sign-in/email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password, rememberMe: true, callbackURL: window.location.pathname || "/app.html" })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return { success: false, error: body.message || body.error || "Login failed" };
+    const session = await loadNeonSession();
+    if (session.error) return { success: false, error: session.error.message };
+    await this.refreshProfile();
+    return { success: true, data: session.data };
   },
-  async signUp(email, password, displayName, emailRedirectTo) {
-    if (!supabaseClient) return { success: false, error: "Supabase not configured. Copy config.example.js to config.js." };
-    const payload = { email, password };
-    if (displayName && displayName.trim()) payload.data = { display_name: displayName.trim() };
-    if (emailRedirectTo) payload.options = { emailRedirectTo };
-    const { data, error } = await supabaseClient.auth.signUp(payload);
-    if (error) return { success: false, error: error.message };
-    return { success: true, data };
+  async signUp(email, password, displayName) {
+    if (!NEON_AUTH_URL) return { success: false, error: "Neon Auth not configured. Set NEON_AUTH_URL in config.js." };
+    const res = await fetch(`${NEON_AUTH_URL}/sign-up/email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password, name: displayName || email.split("@")[0], callbackURL: window.location.pathname || "/app.html" })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return { success: false, error: body.message || body.error || "Signup failed" };
+    setCachedProfile({ display_name: displayName || "" });
+    const session = await loadNeonSession();
+    return { success: true, data: session.error ? { user: body.user || null, session: null, needsVerification: true } : session.data };
+  },
+  async resendSignupOtp(email) {
+    if (!NEON_AUTH_URL) return { success: false, error: "Neon Auth not configured." };
+    const res = await fetch(`${NEON_AUTH_URL}/email-otp/send-verification-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, type: "email-verification" })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return { success: false, error: body.message || body.error || "Could not resend verification code" };
+    return { success: true, data: body };
+  },
+  async verifySignupOtp(email, code) {
+    if (!NEON_AUTH_URL) return { success: false, error: "Neon Auth not configured." };
+    const res = await fetch(`${NEON_AUTH_URL}/email-otp/verify-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, otp: code })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return { success: false, error: body.message || body.error || "Could not verify email" };
+    const session = await loadNeonSession();
+    await this.refreshProfile();
+    return { success: true, data: session.error ? body : session.data };
   },
   async signOut() {
-    if (supabaseClient) await supabaseClient.auth.signOut();
+    clearStoredToken();
+    try { if (NEON_AUTH_URL) await fetch(`${NEON_AUTH_URL}/sign-out`, { method: "POST", credentials: "include" }); } catch (_) {}
   },
   async getUser() {
-    if (!supabaseClient) return null;
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    return user;
+    const { data: { session } } = await getSession();
+    if (!session) return null;
+    return session.user;
+  },
+  async getSession() {
+    return getSession();
+  },
+  async refreshProfile() {
+    try {
+      const body = await apiFetch("/profile", { method: "GET" });
+      if (body.profile) setCachedProfile(body.profile);
+      return body.profile || getCachedProfile();
+    } catch (_) {
+      return getCachedProfile();
+    }
+  },
+  async isAdmin() {
+    try {
+      const body = await apiFetch("/admin/me", { method: "GET" });
+      return !!body.admin;
+    } catch (_) { return false; }
   },
   async updateUser(updates) {
-    if (!supabaseClient) return { success: false, error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.auth.updateUser(updates);
-    if (error) return { success: false, error: error.message };
-    return { success: true, data };
+    if (updates?.password) return { success: false, error: "Password changes are not implemented for Neon Auth yet." };
+    if (updates?.email) return { success: false, error: "Primary email changes are not implemented for Neon Auth yet." };
+    const current = getCachedProfile();
+    const next = Object.assign({}, current, updates?.data || {});
+    try {
+      const body = await apiFetch("/profile", { method: "PUT", body: JSON.stringify(next) });
+      setCachedProfile(body.profile || next);
+      return { success: true, data: { user: await this.getUser() } };
+    } catch (e) {
+      return { success: false, error: e.message || "Could not update profile" };
+    }
   },
   async getAuthenticatorAssuranceLevel() {
-    if (!supabaseClient) return { currentLevel: 'aal1', nextLevel: 'aal1' };
-    const { data, error } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (error) return { currentLevel: 'aal1', nextLevel: 'aal1' };
-    return data || { currentLevel: 'aal1', nextLevel: 'aal1' };
+    return { currentLevel: 'aal1', nextLevel: 'aal1' };
   },
   async mfaListFactors() {
-    if (!supabaseClient) return { data: { totp: [] }, error: { message: 'Not configured' } };
-    return await supabaseClient.auth.mfa.listFactors();
+    return { data: { totp: [] }, error: null };
   },
   async mfaEnroll() {
-    if (!supabaseClient) return { data: null, error: { message: 'Not configured' } };
-    return await supabaseClient.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName: 'Lendpile'
-    });
+    return { data: null, error: { message: '2FA is not implemented for Neon Auth yet.' } };
   },
-  async mfaChallenge(factorId) {
-    if (!supabaseClient) return { data: null, error: { message: 'Not configured' } };
-    return await supabaseClient.auth.mfa.challenge({ factorId });
+  async mfaChallenge() {
+    return { data: null, error: { message: '2FA is not implemented for Neon Auth yet.' } };
   },
-  async mfaVerify({ factorId, challengeId, code }) {
-    if (!supabaseClient) return { data: null, error: { message: 'Not configured' } };
-    return await supabaseClient.auth.mfa.verify({ factorId, challengeId, code });
+  async mfaVerify() {
+    return { data: null, error: { message: '2FA is not implemented for Neon Auth yet.' } };
   },
-  async mfaUnenroll(factorId) {
-    if (!supabaseClient) return { error: { message: 'Not configured' } };
-    return await supabaseClient.auth.mfa.unenroll({ factorId });
+  async mfaUnenroll() {
+    return { error: { message: '2FA is not implemented for Neon Auth yet.' } };
   },
-  async resetPasswordForEmail(email, redirectTo) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
-    if (error) return { error: error.message };
-    return {};
+  async resetPasswordForEmail() {
+    return { error: "Password reset is not implemented for Neon Auth yet." };
   },
   onAuthStateChanged(callback) {
-    if (supabaseClient) supabaseClient.auth.onAuthStateChange((event, session) => callback(event, session));
+    setTimeout(async () => callback("INITIAL_SESSION", (await getSession()).data.session), 0);
   }
 };
 
 const SyncService = {
   async syncData() {
-    if (!supabaseClient) return;
     try {
       const user = await AuthService.getUser();
       if (!user) return;
       const loanData = StorageService.load("loanData");
-      const { error } = await supabaseClient.from('loan_data')
-        .upsert({ user_id: user.id, data: loanData }, { onConflict: 'user_id' });
-      if (error) console.error('Sync error:', error);
+      await apiFetch("/loan-data", { method: "PUT", body: JSON.stringify({ data: loanData }) });
     } catch (e) {
       console.error('Sync failed:', e);
     }
   },
   async loadData() {
-    if (!supabaseClient) return [];
     try {
       const user = await AuthService.getUser();
       if (!user) return [];
-      const { data, error } = await supabaseClient.from('loan_data')
-        .select('data').eq('user_id', user.id).single();
-      if (error) {
-        console.error('Load error:', error);
-        return [];
-      }
-      return data && data.data != null ? data.data : [];
+      const body = await apiFetch("/loan-data", { method: "GET" });
+      return body && body.data != null ? body.data : [];
     } catch (e) {
       console.error('Load failed:', e);
       return [];
@@ -128,150 +256,72 @@ const SyncService = {
 
 /** Create and redeem share links; update shared loan when recipient has edit permission */
 const ShareService = {
+  async getSharePreview(token) {
+    if (!LENDPILE_API_URL) return { error: "Lendpile API not configured." };
+    try {
+      const res = await fetch(`${LENDPILE_API_URL}/shares/preview/${encodeURIComponent(token)}`, { credentials: "include" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: body.error || "Link expired or invalid." };
+      return { data: body.preview || null };
+    } catch (e) { return { error: e.message || "Link expired or invalid." }; }
+  },
   async createShare(loan, options) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
     const user = await AuthService.getUser();
     if (!user) return { error: "You must be signed in to share a loan." };
-    const token = crypto.randomUUID();
-    const displayName = (user.user_metadata && user.user_metadata.display_name) || user.email || "";
-    const expiresAt = new Date();
-    const days = Math.max(1, parseInt(options.expiresInDays, 10) || 7);
-    expiresAt.setDate(expiresAt.getDate() + days);
-    const { error } = await supabaseClient.from("loan_shares").insert({
-      token,
-      owner_id: user.id,
-      loan_id: loan.id,
-      loan_snapshot: loan,
-      permission: options.permission || "view",
-      recipient_view: options.recipientView || "borrowing",
-      owner_display_name: displayName,
-      expires_at: expiresAt.toISOString()
-    });
-    if (error) return { error: error.message };
-    const baseUrl = window.location.origin + window.location.pathname;
-    return { shareUrl: `${baseUrl}?share=${token}` };
+    try {
+      const body = await apiFetch("/shares", { method: "POST", body: JSON.stringify({ loan, options }) });
+      const baseUrl = window.location.origin + window.location.pathname;
+      return { shareUrl: `${baseUrl}?share=${body.token}` };
+    } catch (e) { return { error: e.message }; }
   },
   async redeemShare(token) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("redeem_share", { share_token: token });
-    if (error) return { error: error.message };
-    if (!data) return { error: "Link expired or invalid." };
-    return { share: data };
+    try {
+      const body = await apiFetch(`/shares/redeem/${encodeURIComponent(token)}`, { method: "POST" });
+      if (!body.share) return { error: "Link expired or invalid." };
+      return { share: body.share };
+    } catch (e) { return { error: e.message }; }
   },
   async updateSharedLoan(token, loan) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("update_shared_loan", {
-      share_token: token,
-      loan_json: loan
-    });
-    if (error) return { error: error.message };
-    return { ok: data === true };
+    try {
+      const body = await apiFetch(`/shares/${encodeURIComponent(token)}/loan`, { method: "PUT", body: JSON.stringify({ loan }) });
+      return { ok: body.ok === true };
+    } catch (e) { return { error: e.message }; }
   },
   async listMyShares() {
-    if (!supabaseClient) return { error: "Supabase not configured.", shares: [] };
-    const user = await AuthService.getUser();
-    if (!user) return { error: "Not signed in.", shares: [] };
-    const { data, error } = await supabaseClient.from("loan_shares")
-      .select("id, token, loan_id, loan_snapshot, permission, recipient_view, expires_at, used_at, recipient_id, recipient_email, recipient_display_name, transfer_requested_at, created_at, edit_requested_at, edit_requested_by")
-      .eq("owner_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) return { error: error.message, shares: [] };
-    return { shares: data || [] };
+    try { const body = await apiFetch("/shares/mine", { method: "GET" }); return { shares: body.shares || [] }; }
+    catch (e) { return { error: e.message, shares: [] }; }
   },
-  /** Shares where I am the recipient (used for "shared with me" list; one source of truth remains owner's data). */
   async listSharesReceived() {
-    if (!supabaseClient) return { error: "Supabase not configured.", shares: [] };
-    const user = await AuthService.getUser();
-    if (!user) return { error: "Not signed in.", shares: [] };
-    const { data, error } = await supabaseClient.from("loan_shares")
-      .select("id, token, loan_id, loan_snapshot, permission, recipient_view, owner_display_name, expires_at, used_at, recipient_id, edit_requested_at, edit_request_resolved_at, edit_request_outcome, recipient_seen_resolution_at")
-      .eq("recipient_id", user.id)
-      .gt("expires_at", new Date().toISOString())
-      .order("used_at", { ascending: false });
-    if (error) return { error: error.message, shares: [] };
-    return { shares: data || [] };
+    try { const body = await apiFetch("/shares/received", { method: "GET" }); return { shares: body.shares || [] }; }
+    catch (e) { return { error: e.message, shares: [] }; }
   },
   async revokeShare(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { error } = await supabaseClient.from("loan_shares").delete().eq("id", shareId);
-    if (error) return { error: error.message };
-    return { ok: true };
+    try { await apiFetch(`/shares/id/${encodeURIComponent(shareId)}`, { method: "DELETE" }); return { ok: true }; }
+    catch (e) { return { error: e.message }; }
   },
-  /** Recipient revokes the share (same effect as owner revoke: share is deleted, link stops working). */
   async revokeShareAsRecipient(token) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { error } = await supabaseClient.from("loan_shares").delete().eq("token", token);
-    if (error) return { error: error.message };
-    return { ok: true };
+    try { await apiFetch(`/shares/token/${encodeURIComponent(token)}`, { method: "DELETE" }); return { ok: true }; }
+    catch (e) { return { error: e.message }; }
   },
   async updateShare(shareId, updates) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const payload = {};
-    if (updates.permission) payload.permission = updates.permission;
-    if (updates.recipientView) payload.recipient_view = updates.recipientView;
-    if (Object.keys(payload).length === 0) return { ok: true };
-    const { error } = await supabaseClient.from("loan_shares").update(payload).eq("id", shareId);
-    if (error) return { error: error.message };
-    return { ok: true };
+    try { await apiFetch(`/shares/id/${encodeURIComponent(shareId)}`, { method: "PUT", body: JSON.stringify(updates || {}) }); return { ok: true }; }
+    catch (e) { return { error: e.message }; }
   },
-  async requestEditAccess(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("request_edit_access", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
-  async approveEditRequest(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("approve_edit_request", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
-  async declineEditRequest(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("decline_edit_request", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
-  async markEditResolutionSeen(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("mark_edit_resolution_seen", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
+  async requestEditAccess(shareId) { return this.shareAction(shareId, "request-edit"); },
+  async approveEditRequest(shareId) { return this.shareAction(shareId, "approve-edit"); },
+  async declineEditRequest(shareId) { return this.shareAction(shareId, "decline-edit"); },
+  async markEditResolutionSeen(shareId) { return this.shareAction(shareId, "mark-edit-seen"); },
   async listTransferOffers() {
-    if (!supabaseClient) return { error: "Supabase not configured.", offers: [] };
-    const user = await AuthService.getUser();
-    if (!user) return { offers: [] };
-    const { data, error } = await supabaseClient.from("loan_shares")
-      .select("id, loan_snapshot, owner_display_name, transfer_requested_at")
-      .eq("recipient_id", user.id)
-      .not("transfer_requested_at", "is", null);
-    if (error) return { error: error.message, offers: [] };
-    return { offers: data || [] };
+    try { const body = await apiFetch("/shares/transfer-offers", { method: "GET" }); return { offers: body.offers || [] }; }
+    catch (e) { return { error: e.message, offers: [] }; }
   },
-  async requestTransferToRecipient(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("request_transfer_to_recipient", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
-  async acceptTransfer(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("accept_transfer", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
-  async declineTransfer(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("decline_transfer", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
-  },
-  async cancelTransferRequest(shareId) {
-    if (!supabaseClient) return { error: "Supabase not configured." };
-    const { data, error } = await supabaseClient.rpc("cancel_transfer_request", { share_id: shareId });
-    if (error) return { error: error.message };
-    return { ok: data === true };
+  async requestTransferToRecipient(shareId) { return this.shareAction(shareId, "request-transfer"); },
+  async acceptTransfer(shareId) { return this.shareAction(shareId, "accept-transfer"); },
+  async declineTransfer(shareId) { return this.shareAction(shareId, "decline-transfer"); },
+  async cancelTransferRequest(shareId) { return this.shareAction(shareId, "cancel-transfer"); },
+  async shareAction(shareId, action) {
+    try { const body = await apiFetch(`/shares/id/${encodeURIComponent(shareId)}/${action}`, { method: "POST" }); return { ok: body.ok === true }; }
+    catch (e) { return { error: e.message }; }
   }
 };
 
@@ -632,7 +682,7 @@ const LanguageService = {
       deleteAccountConfirm: 'Skriv in ditt lösenord och skriv DELETE i rutan nedan för att bekräfta.',
       deleteAccountTypeDelete: 'Skriv DELETE för att bekräfta',
       deleteMyAccount: 'Ta bort mitt konto',
-      deleteAccountUnavailable: 'Kontoradering är inte tillgänglig. Om du använder Supabase Edge Function eller egen backend, kontrollera att den är utplacerad och att URL:en stämmer. Annars kan du ta bort användaren i Supabase Dashboard → Authentication → Users.',
+      deleteAccountUnavailable: 'Kontoradering är inte tillgänglig. Kontrollera att Lendpile API Worker är utplacerad och att URL:en stämmer.',
       setDefaultFirst: 'Sätt en annan e‑post som standard först.',
       displayName: 'Visningsnamn',
       displayNameHelp: 'Används t.ex. när du delar ett lån: "David delar ett lån".',
@@ -997,7 +1047,7 @@ const LanguageService = {
       deleteAccountConfirm: 'Enter your password and type DELETE in the box below to confirm.',
       deleteAccountTypeDelete: 'Type DELETE to confirm',
       deleteMyAccount: 'Delete my account',
-      deleteAccountUnavailable: 'Account deletion is unavailable. If you use the Supabase Edge Function or a custom backend, ensure it is deployed and the URL is correct. Otherwise delete the user in Supabase Dashboard → Authentication → Users.',
+      deleteAccountUnavailable: 'Account deletion is unavailable. Ensure the Lendpile API Worker is deployed and the URL is correct.',
       setDefaultFirst: 'Set another email as default first.',
       displayName: 'Display name',
       displayNameHelp: 'Shown when you share a loan, e.g. "David is sharing a loan".',
@@ -1086,10 +1136,7 @@ async function updateUserHeader() {
     const displayName = (user.user_metadata && user.user_metadata.display_name) ? String(user.user_metadata.display_name).trim() : '';
     emailEl.textContent = displayName || user.email;
     document.getElementById("profile-dropdown").classList.remove("open");
-    if (adminLink) {
-      const isAdmin = user.app_metadata && user.app_metadata.role === "admin";
-      adminLink.style.display = isAdmin ? "" : "none";
-    }
+    if (adminLink) adminLink.style.display = (await AuthService.isAdmin()) ? "" : "none";
     updateSaveToAccountBar();
   } else {
     block.classList.add("signed-out");
@@ -1137,6 +1184,8 @@ function updateLoginPaneShareContext() {
 function showLoginPane() {
   document.getElementById("login-pane").classList.remove("hidden");
   document.getElementById("signup-pane").classList.add("hidden");
+  document.getElementById("signup-form")?.classList.remove("hidden");
+  document.getElementById("signup-verify-form")?.classList.add("hidden");
   document.getElementById("recovery-set-password-pane").classList.add("hidden");
   document.getElementById("forgot-password-pane").classList.add("hidden");
   document.getElementById("login-feedback").textContent = "";
@@ -1145,6 +1194,8 @@ function showLoginPane() {
 }
 function showSignupPane() {
   document.getElementById("signup-pane").classList.remove("hidden");
+  document.getElementById("signup-form")?.classList.remove("hidden");
+  document.getElementById("signup-verify-form")?.classList.add("hidden");
   document.getElementById("login-pane").classList.add("hidden");
   document.getElementById("recovery-set-password-pane").classList.add("hidden");
   document.getElementById("forgot-password-pane").classList.add("hidden");
@@ -1229,25 +1280,20 @@ async function populateAccountSettings() {
   const mfaEnableBtn = document.getElementById("account-mfa-enable");
   const mfaDisableBtn = document.getElementById("account-mfa-disable");
   const mfaStatusText = document.getElementById("account-mfa-status");
-  const factors = await AuthService.mfaListFactors();
-  const hasTotp = factors.data && factors.data.totp && factors.data.totp.length > 0;
-  const has2FA = hasTotp;
   if (mfaEnableBtn) {
-    mfaEnableBtn.style.display = has2FA ? "none" : "";
-    mfaEnableBtn.classList.toggle("hidden", !!has2FA);
+    mfaEnableBtn.style.display = "none";
+    mfaEnableBtn.classList.add("hidden");
   }
   if (mfaDisableBtn) {
-    mfaDisableBtn.style.display = has2FA ? "" : "none";
-    mfaDisableBtn.classList.toggle("hidden", !has2FA);
+    mfaDisableBtn.style.display = "none";
+    mfaDisableBtn.classList.add("hidden");
   }
   if (mfaStatusText) {
-    mfaStatusText.textContent = has2FA
-      ? (LanguageService.translate("twoFactorOnStatus") || "2FA is on. You can disable it below.")
-      : "";
-    mfaStatusText.classList.toggle("hidden", !has2FA);
+    mfaStatusText.textContent = "2FA is not available in this Neon Auth migration yet.";
+    mfaStatusText.classList.remove("hidden");
   }
   const mfaHelp = document.querySelector(".account-mfa-help");
-  if (mfaHelp) mfaHelp.classList.toggle("hidden", !!has2FA);
+  if (mfaHelp) mfaHelp.classList.add("hidden");
 }
 
 /** Strong password: min 8 chars, at least one upper, one lower, one number or special */
@@ -2574,7 +2620,7 @@ const UIHandler = {
   async maybeShowSecurityPrompt() {
     if (sessionStorage.getItem("offlineMode")) return;
     const user = await AuthService.getUser();
-    if (!user || !user.email) return;
+    return;
     const factors = await AuthService.mfaListFactors();
     const hasTotp = factors.data && factors.data.totp && factors.data.totp.length > 0;
     if (hasTotp) return;
@@ -3933,28 +3979,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const hash = window.location.hash.slice(1);
   if (hash) {
     const params = new URLSearchParams(hash);
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    const type = params.get("type");
-    if (accessToken && supabaseClient) {
-      try {
-        await supabaseClient.auth.setSession({ access_token: accessToken, refresh_token: refreshToken || "" });
-        if (type === "recovery") window._recoverySetPassword = true;
-        else window._emailJustVerified = true;
-      } catch (e) {
-        console.error("Session recovery from URL failed:", e);
-      }
+    const error = params.get("error");
+    const errorCode = params.get("error_code");
+    const errorDesc = params.get("error_description");
+    if (error || errorCode || errorDesc) {
+      const feedback = document.getElementById("login-feedback");
+      feedback.textContent = LanguageService.translate("linkExpiredOrInvalid");
+      feedback.className = "login-feedback-common";
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    } else {
-      const error = params.get("error");
-      const errorCode = params.get("error_code");
-      const errorDesc = params.get("error_description");
-      if (error || errorCode || errorDesc) {
-        const feedback = document.getElementById("login-feedback");
-        feedback.textContent = LanguageService.translate("linkExpiredOrInvalid");
-        feedback.className = "login-feedback-common";
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
     }
   }
   const loginModal = document.getElementById("login-modal");
@@ -3981,7 +4013,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         invalidText.classList.add("hidden");
         try {
           // Link stays valid until someone signs in and accepts (redeem), or until expires_at. Preview does not consume the link.
-          const { data: preview, error } = await supabaseClient.rpc("get_share_preview", { share_token: window._pendingShareToken });
+          const { data: preview, error } = await ShareService.getSharePreview(window._pendingShareToken);
           if (error || !preview) {
             previewText.classList.add("hidden");
             invalidText.classList.remove("hidden");
@@ -4109,11 +4141,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       feedback.className = "error";
       return;
     }
-    if (!supabaseClient) {
-      feedback.textContent = "Supabase not configured.";
-      feedback.className = "error";
-      return;
-    }
     const user = await AuthService.getUser();
     if (!user?.email) {
       feedback.textContent = LanguageService.translate("currentPasswordIncorrect");
@@ -4126,9 +4153,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       feedback.className = "error";
       return;
     }
-    const { error } = await supabaseClient.auth.updateUser({ password: newPass });
-    if (error) {
-      feedback.textContent = error.message;
+    const result = await AuthService.updateUser({ password: newPass });
+    if (!result.success) {
+      feedback.textContent = result.error;
       feedback.className = "error";
       return;
     }
@@ -4396,19 +4423,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       feedback.className = "error";
       return;
     }
-    if (!supabaseClient) {
-      feedback.textContent = "Supabase not configured.";
-      feedback.className = "error";
-      return;
-    }
-    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const { data: sessionData } = await AuthService.getSession();
     const accessToken = sessionData?.session?.access_token;
     if (!accessToken) {
       feedback.textContent = LanguageService.translate("deleteAccountUnavailable");
       feedback.className = "error";
       return;
     }
-    const deleteAccountUrl = window.DELETE_ACCOUNT_URL || (SUPABASE_URL && `${SUPABASE_URL}/functions/v1/delete-my-account`);
+    const deleteAccountUrl = window.DELETE_ACCOUNT_URL || (LENDPILE_API_URL && `${LENDPILE_API_URL}/delete-my-account`);
     if (!deleteAccountUrl) {
       feedback.textContent = LanguageService.translate("deleteAccountUnavailable");
       feedback.className = "error";
@@ -4492,7 +4514,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
       if (error.status === 422 || msgLower.includes("422") || msgLower.includes("unprocessable")) {
-        msg += " Enable MFA in Supabase Dashboard: Authentication → Multi-Factor (MFA).";
+        msg += " MFA is not available in this Neon Auth migration yet.";
       }
       UIHandler.showFeedback(msg);
       UIHandler.closeModal("mfa-enroll-modal");
@@ -5310,24 +5332,58 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
     feedback.className = "login-feedback-common";
     return;
   }
-  const shareToken = window._pendingShareToken;
-  const emailRedirectTo = shareToken
-    ? (window.location.origin + window.location.pathname + "?share=" + encodeURIComponent(shareToken))
-    : undefined;
-  const result = await AuthService.signUp(email, password, displayName, emailRedirectTo);
+  const result = await AuthService.signUp(email, password, displayName);
   if (result.success) {
+    window._pendingSignupEmail = email;
     const localLoans = StorageService.load("loanData") || [];
     const n = localLoans.length;
-    let msg = LanguageService.translate("signUpSuccess");
+    let msg = "Account created. Enter the verification code sent to your email.";
     if (n > 0) {
-      const returnMsg = (LanguageService.translate("signUpSuccessReturnToSave") || "Return to this page after confirming your email to sign in and save your {n} loan(s) to your account.").replace("{n}", String(n));
+      const returnMsg = "After verification, sign in to save your {n} loan(s) to your account.".replace("{n}", String(n));
       msg += "\n\n" + returnMsg;
     }
     feedback.textContent = msg;
     feedback.className = "login-feedback-common success";
-    document.getElementById("signup-form").reset();
+    document.getElementById("signup-form").classList.add("hidden");
+    document.getElementById("signup-verify-form")?.classList.remove("hidden");
   } else {
     feedback.textContent = result.error;
     feedback.className = "login-feedback-common";
   }
+});
+
+document.getElementById("signup-verify-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const feedback = document.getElementById("login-feedback");
+  const email = window._pendingSignupEmail || document.getElementById("signup-email")?.value.trim();
+  const code = document.getElementById("signup-verification-code")?.value.trim().replace(/\s/g, "");
+  feedback.textContent = "";
+  feedback.className = "login-feedback-common";
+  if (!email || !code) {
+    feedback.textContent = "Enter the verification code from your email.";
+    return;
+  }
+  const result = await AuthService.verifySignupOtp(email, code);
+  if (!result.success) {
+    feedback.textContent = result.error;
+    return;
+  }
+  feedback.textContent = "Email verified. You can now sign in.";
+  feedback.className = "login-feedback-common success";
+  document.getElementById("signup-form").reset();
+  document.getElementById("signup-verify-form").reset();
+  window._pendingSignupEmail = null;
+  setTimeout(showLoginPane, 1200);
+});
+
+document.getElementById("signup-resend-code-btn")?.addEventListener("click", async () => {
+  const feedback = document.getElementById("login-feedback");
+  const email = window._pendingSignupEmail || document.getElementById("signup-email")?.value.trim();
+  if (!email) {
+    feedback.textContent = "Enter your email first.";
+    return;
+  }
+  const result = await AuthService.resendSignupOtp(email);
+  feedback.textContent = result.success ? "Verification code resent." : result.error;
+  feedback.className = result.success ? "login-feedback-common success" : "login-feedback-common";
 });

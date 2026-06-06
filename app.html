@@ -22,8 +22,6 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <!-- Apache ECharts (reliable HTML tooltips, no canvas tooltip issues) -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-  <!-- Supabase Client (v2) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Config (copy config.example.js to config.js; config.js is gitignored) -->
   <script src="config.js"></script>
   <link rel="stylesheet" href="styles.css" />
@@ -721,6 +719,19 @@
             <button type="submit" class="btn-primary" id="signup-submit-btn" data-translate="signUp">Create account</button>
             <p class="login-switch-wrap">
               <button type="button" class="login-switch-link" id="signup-to-login-link" data-translate="haveAccountLogIn"></button>
+            </p>
+          </div>
+        </form>
+        <form id="signup-verify-form" class="hidden">
+          <div class="login-form-group">
+            <label for="signup-verification-code" data-translate="verificationCode">Verification code</label>
+            <input type="text" id="signup-verification-code" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code" placeholder="123456">
+            <p class="login-field-hint">Enter the code sent to your email.</p>
+          </div>
+          <div class="login-actions">
+            <button type="submit" class="btn-primary">Verify email</button>
+            <p class="login-switch-wrap">
+              <button type="button" class="login-switch-link" id="signup-resend-code-btn">Resend code</button>
             </p>
           </div>
         </form>
