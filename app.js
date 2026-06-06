@@ -398,11 +398,20 @@ const LanguageService = {
       dayCountActual365: 'Actual/365 - verkliga kalenderdagar (standard)',
       dayCountThirty360: '30/360 - enkel månadsränta',
       dayCountActual360: 'Actual/360 - kommersiell',
+      dayCountActual365Short: 'Actual/365',
+      dayCountThirty360Short: '30/360',
+      dayCountActual360Short: 'Actual/360',
+      dayCountModalTitle: 'Välj ränteberäkning',
+      dayCountModalIntro: 'Detta styr hur årsräntan omvandlas till ränta över tid.',
       dayCountActual365Help: 'Standard för nya lån. Ränta räknas på verkliga dagar och ett 365-dagars år. Bra för lån mellan familj och vänner eftersom varje faktisk dag räknas naturligt.',
       dayCountThirty360Help: 'Varje månad räknas som 30 dagar och året som 360 dagar. Enkelt, förutsägbart och vanligt i vissa avtal, men följer inte den faktiska kalendern.',
       dayCountActual360Help: 'Ränta räknas på verkliga dagar men med ett 360-dagars år. Vanligt i kommersiella sammanhang och ger oftast något högre ränta än Actual/365.',
+      dayCountActual365Card: 'Verkliga kalenderdagar och ett 365-dagars år. Bästa standardvalet för familj, vänner och personliga lån.',
+      dayCountThirty360Card: 'Varje månad räknas som 30 dagar. Enkelt och förutsägbart för månadsavtal.',
+      dayCountActual360Card: 'Verkliga kalenderdagar och ett 360-dagars år. Vanligt i vissa kommersiella lån.',
       learnInterestCalculation: 'Läs hur ränteberäkningen fungerar',
       interestCalculationGuide: 'Guide till ränteberäkning',
+      dayCountMore: 'Mer om ränteberäkning',
       interestChanges: 'Ränteförändringar',
       loanChanges: 'Låneförändringar',
       removeLoan: 'Ta bort Lån',
@@ -775,11 +784,20 @@ const LanguageService = {
       dayCountActual365: 'Actual/365 - real calendar days (default)',
       dayCountThirty360: '30/360 - simple monthly',
       dayCountActual360: 'Actual/360 - commercial',
+      dayCountActual365Short: 'Actual/365',
+      dayCountThirty360Short: '30/360',
+      dayCountActual360Short: 'Actual/360',
+      dayCountModalTitle: 'Choose interest calculation',
+      dayCountModalIntro: 'This controls how annual interest is converted into interest over time.',
       dayCountActual365Help: 'Default for new loans. Interest uses real calendar days and a 365-day year. Good for family and friend loans because each actual day counts naturally.',
       dayCountThirty360Help: 'Every month counts as 30 days and the year as 360 days. Simple, predictable, and common in some contracts, but not based on the actual calendar.',
       dayCountActual360Help: 'Interest uses real calendar days but a 360-day year. Common in commercial contexts and usually charges slightly more interest than Actual/365.',
+      dayCountActual365Card: 'Real calendar days and a 365-day year. Best default for family, friends, and personal loans.',
+      dayCountThirty360Card: 'Every month counts as 30 days. Simple and predictable for monthly agreements.',
+      dayCountActual360Card: 'Real calendar days and a 360-day year. Common in some commercial loans.',
       learnInterestCalculation: 'Learn how interest calculation works',
       interestCalculationGuide: 'Interest calculation guide',
+      dayCountMore: 'More about interest calculation',
       interestChanges: 'Interest Changes',
       loanChanges: 'Loan Changes',
       removeLoan: 'Remove Loan',
@@ -1458,20 +1476,31 @@ function getLoanDayCountConventionForDisplay(loan) {
 function updateDayCountHelp() {
   const select = document.getElementById("loanDayCountConvention");
   const help = document.getElementById("day-count-help");
-  if (!select || !help) return;
+  const selectedTitle = document.getElementById("day-count-selected-title");
+  if (!select) return;
   const key = select.value === "actual360"
     ? "dayCountActual360Help"
     : select.value === "thirty360"
       ? "dayCountThirty360Help"
       : "dayCountActual365Help";
-  help.textContent = LanguageService.translate(key);
+  if (help) help.textContent = LanguageService.translate(key);
+  if (selectedTitle) selectedTitle.textContent = formatDayCountConventionShort(select.value);
+  document.querySelectorAll(".day-count-option").forEach(option => {
+    const selected = option.getAttribute("data-day-count") === select.value;
+    option.classList.toggle("selected", selected);
+    option.setAttribute("aria-checked", selected ? "true" : "false");
+  });
 }
 
 function formatDayCountConvention(value) {
+  return formatDayCountConventionShort(value);
+}
+
+function formatDayCountConventionShort(value) {
   const convention = LendpileCalculations.normalizeDayCountConvention(value, "thirty360");
-  if (convention === "actual360") return LanguageService.translate("dayCountActual360");
-  if (convention === "thirty360") return LanguageService.translate("dayCountThirty360");
-  return LanguageService.translate("dayCountActual365");
+  if (convention === "actual360") return LanguageService.translate("dayCountActual360Short");
+  if (convention === "thirty360") return LanguageService.translate("dayCountThirty360Short");
+  return LanguageService.translate("dayCountActual365Short");
 }
 
 /********************************************************
@@ -1589,6 +1618,21 @@ const UIHandler = {
       });
     });
     document.getElementById("loanDayCountConvention")?.addEventListener("change", updateDayCountHelp);
+    document.getElementById("day-count-open-btn")?.addEventListener("click", () => {
+      updateDayCountHelp();
+      UIHandler.showModal("day-count-modal");
+    });
+    document.querySelectorAll(".day-count-option").forEach(option => {
+      option.setAttribute("role", "radio");
+      option.addEventListener("click", () => {
+        const value = option.getAttribute("data-day-count");
+        const select = document.getElementById("loanDayCountConvention");
+        if (!value || !select) return;
+        select.value = value;
+        updateDayCountHelp();
+        UIHandler.closeModal("day-count-modal");
+      });
+    });
     document.querySelectorAll(".btn-close").forEach(btn => {
       btn.addEventListener("click", ev => {
         const modal = ev.target.closest(".modal");
@@ -1660,7 +1704,7 @@ const UIHandler = {
   applyLockState(control, shouldLock) {
     const modal = control.closest(".modal");
     let fields = [];
-    if (modal.id === "loan-modal") { fields = ["loanStartDate", "loanInitialAmount"]; }
+    if (modal.id === "loan-modal") { fields = ["loanStartDate", "loanInitialAmount", "loanDayCountConvention"]; }
     else if (modal.id === "amortization-modal") { fields = ["amortizationAmount", "amortizationStartDate"]; }
     UIHandler.setLockState(modal, fields, shouldLock);
   },
@@ -1672,6 +1716,10 @@ const UIHandler = {
       const el = document.getElementById(fid);
       if (!el) return;
       el.disabled = shouldLock;
+      if (fid === "loanDayCountConvention") {
+        const btn = document.getElementById("day-count-open-btn");
+        if (btn) btn.disabled = shouldLock;
+      }
       const container = el.closest("div");
       if (shouldLock) {
         container.classList.add("locked-field-container");
@@ -3022,7 +3070,7 @@ const FormHandler = {
       removeBtn.style.display = "block";
       removeBtn.setAttribute("data-loan-index", index);
       removeBtn.onclick = () => { ConfirmHandler.confirmDelete('loan', index); };
-      UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
+      UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount", "loanDayCountConvention"], true);
       document.getElementById("loan-initial-interest-row").style.display = "none";
       document.getElementById("interest-section-help").style.display = "none";
       document.getElementById("loan-changes-section-help").style.display = "none";
@@ -3032,7 +3080,7 @@ const FormHandler = {
       title.textContent = LanguageService.translate("addLoan");
       removeBtn.style.display = "none";
       removeBtn.removeAttribute("data-loan-index");
-      UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], false);
+      UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount", "loanDayCountConvention"], false);
       document.getElementById("loan-initial-interest-row").style.display = "flex";
       document.getElementById("loanInitialInterestRate").value = "";
       document.getElementById("loanInitialInterestRate").placeholder = LanguageService.currentLanguage === "sv" ? "t.ex. 4,5" : "e.g. 4.5";
@@ -3147,7 +3195,7 @@ const FormHandler = {
     document.getElementById("loan-initial-interest-row").style.display = "none";
     document.getElementById("interest-section-help").style.display = "none";
     document.getElementById("loan-changes-section-help").style.display = "none";
-    UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
+    UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount", "loanDayCountConvention"], true);
     this.attachChangeHandlers();
     UIHandler.showModal("loan-modal");
   },
@@ -3245,7 +3293,7 @@ const FormHandler = {
         }
       });
     }
-    UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
+    UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount", "loanDayCountConvention"], true);
     ["loanName", "loanCurrency", "loanDayCountConvention"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.closest(".loan-field-wrap")?.classList.add("locked-field-container");

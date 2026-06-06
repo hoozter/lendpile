@@ -178,11 +178,15 @@
           <div class="form-row">
             <label for="loanDayCountConvention" data-translate="dayCountConvention">Interest calculation:</label>
             <div class="loan-field-wrap">
-              <select id="loanDayCountConvention" required>
+              <select id="loanDayCountConvention" required class="hidden" aria-hidden="true" tabindex="-1">
                 <option value="actual365" data-translate="dayCountActual365">Actual/365 - real calendar days (default)</option>
                 <option value="thirty360" data-translate="dayCountThirty360">30/360 - simple monthly</option>
                 <option value="actual360" data-translate="dayCountActual360">Actual/360 - commercial</option>
               </select>
+              <button type="button" id="day-count-open-btn" class="day-count-open-btn">
+                <span id="day-count-selected-title">Actual/365</span>
+                <span class="material-icons" aria-hidden="true">expand_more</span>
+              </button>
               <p class="form-section-help" id="day-count-help"></p>
               <p class="form-section-help"><a href="faq.html#interest-calculation" target="_blank" rel="noopener noreferrer" data-translate="learnInterestCalculation">Learn how interest calculation works</a></p>
             </div>
@@ -209,6 +213,30 @@
           </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- DAY COUNT CONVENTION MODAL -->
+  <div id="day-count-modal" class="modal">
+    <div class="modal-content day-count-modal-content">
+      <span class="btn-close">&times;</span>
+      <h2 class="modal-main-title" data-translate="dayCountModalTitle">Choose interest calculation</h2>
+      <p class="account-field-help" data-translate="dayCountModalIntro">This controls how annual interest is converted into interest over time.</p>
+      <div class="day-count-options" role="radiogroup" aria-label="Interest calculation">
+        <button type="button" class="day-count-option" data-day-count="actual365">
+          <span class="day-count-option-title" data-translate="dayCountActual365Short">Actual/365</span>
+          <span class="day-count-option-desc" data-translate="dayCountActual365Card">Real calendar days and a 365-day year. Best default for family, friends, and personal loans.</span>
+        </button>
+        <button type="button" class="day-count-option" data-day-count="thirty360">
+          <span class="day-count-option-title" data-translate="dayCountThirty360Short">30/360</span>
+          <span class="day-count-option-desc" data-translate="dayCountThirty360Card">Every month counts as 30 days. Simple and predictable for monthly agreements.</span>
+        </button>
+        <button type="button" class="day-count-option" data-day-count="actual360">
+          <span class="day-count-option-title" data-translate="dayCountActual360Short">Actual/360</span>
+          <span class="day-count-option-desc" data-translate="dayCountActual360Card">Real calendar days and a 360-day year. Common in some commercial loans.</span>
+        </button>
+      </div>
+      <p class="account-field-help day-count-more"><a href="faq.html#interest-calculation" target="_blank" rel="noopener noreferrer" data-translate="dayCountMore">More about interest calculation</a></p>
     </div>
   </div>
   

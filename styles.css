@@ -1162,6 +1162,63 @@ th, td {
   color: var(--text-muted, #888);
   margin: 0 0 0.5rem 0;
 }
+.day-count-open-btn {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-background);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  margin: 0 0 6px 0;
+}
+.day-count-open-btn:hover { border-color: var(--primary-color); }
+.day-count-open-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.day-count-open-btn:disabled:hover { border-color: var(--input-border); }
+.day-count-open-btn .material-icons { font-size: 20px; color: var(--text-muted, #888); }
+.day-count-modal-content { max-width: 560px; }
+.day-count-options {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+.day-count-option {
+  width: 100%;
+  min-height: 82px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--section-background);
+  color: var(--text-color);
+  text-align: left;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.day-count-option:hover { border-color: var(--primary-color); }
+.day-count-option.selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 161, 255, 0.22);
+  background: rgba(0, 161, 255, 0.08);
+}
+.day-count-option-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.day-count-option-desc {
+  color: var(--text-muted, #888);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.day-count-more { margin-top: 8px; }
 .amortization-type-help {
   font-size: 0.85rem;
   color: var(--text-muted, #888);
@@ -1987,4 +2044,3 @@ th, td {
 }
 .mfa-feedback.error { color: var(--button-delete); }
 .mfa-feedback.success { color: #2d9d4a; }
-
