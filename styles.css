@@ -1164,8 +1164,10 @@ th, td {
 }
 .day-count-open-btn {
   width: 100%;
-  min-height: 40px;
-  padding: 0 12px;
+  height: auto;
+  min-height: 68px;
+  min-width: 0;
+  padding: 12px 14px;
   border: 1px solid var(--input-border);
   border-radius: 6px;
   background: var(--input-background);
@@ -1173,52 +1175,124 @@ th, td {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 16px;
   text-align: left;
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
 }
-.day-count-open-btn:hover { border-color: var(--primary-color); }
+.day-count-open-btn:hover {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--input-background) 88%, var(--primary-color) 12%);
+}
+.day-count-open-btn:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
 .day-count-open-btn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
 .day-count-open-btn:disabled:hover { border-color: var(--input-border); }
-.day-count-open-btn .material-icons { font-size: 20px; color: var(--text-muted, #888); }
-.day-count-modal-content { max-width: 560px; }
+.day-count-selected-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.day-count-selected-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.day-count-selected-summary {
+  color: var(--text-color);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  opacity: 0.72;
+}
+.day-count-change {
+  border: 1px solid color-mix(in srgb, var(--primary-color) 45%, var(--input-border));
+  border-radius: 999px;
+  color: var(--primary-color);
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 7px 10px;
+}
+.day-count-modal-content {
+  max-width: 640px;
+  padding: 28px 34px 30px;
+}
+.day-count-modal-intro {
+  color: var(--text-color);
+  font-size: 1rem;
+  line-height: 1.55;
+  margin: 10px 0 18px;
+  opacity: 0.86;
+}
 .day-count-options {
   display: grid;
-  gap: 10px;
-  margin: 14px 0;
+  gap: 12px;
+  margin: 16px 0 18px;
 }
 .day-count-option {
   width: 100%;
-  min-height: 82px;
+  height: auto;
+  min-height: 94px;
+  min-width: 0;
   border: 1px solid var(--input-border);
   border-radius: 8px;
-  background: var(--section-background);
+  background: var(--input-background);
   color: var(--text-color);
   text-align: left;
-  padding: 14px 16px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
+  margin: 0;
 }
-.day-count-option:hover { border-color: var(--primary-color); }
+.day-count-option:hover {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--input-background) 90%, var(--primary-color) 10%);
+}
+.day-count-option:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
 .day-count-option.selected {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(0, 161, 255, 0.22);
-  background: rgba(0, 161, 255, 0.08);
+  background: color-mix(in srgb, var(--input-background) 84%, var(--primary-color) 16%);
 }
 .day-count-option-title {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.04rem;
+  line-height: 1.25;
 }
 .day-count-option-desc {
-  color: var(--text-muted, #888);
-  font-size: 0.88rem;
+  color: var(--text-color);
+  font-size: 0.92rem;
   line-height: 1.45;
+  opacity: 0.78;
+  max-width: 52ch;
 }
-.day-count-more { margin-top: 8px; }
+.day-count-option.selected .day-count-option-title {
+  color: var(--primary-color);
+}
+.day-count-more {
+  border-top: 1px solid var(--input-border);
+  margin: 18px 0 0;
+  padding-top: 14px;
+}
+@media (max-width: 520px) {
+  .day-count-modal-content { padding: 24px 20px; }
+  .day-count-open-btn {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .day-count-change { align-self: flex-start; }
+}
 .amortization-type-help {
   font-size: 0.85rem;
   color: var(--text-muted, #888);

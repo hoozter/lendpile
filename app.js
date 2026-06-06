@@ -401,6 +401,9 @@ const LanguageService = {
       dayCountActual365Short: 'Actual/365',
       dayCountThirty360Short: '30/360',
       dayCountActual360Short: 'Actual/360',
+      dayCountActual365Summary: 'Verkliga kalenderdagar',
+      dayCountThirty360Summary: 'Enkelt för månadsavtal',
+      dayCountActual360Summary: 'Vanligt i kommersiella lån',
       dayCountModalTitle: 'Välj ränteberäkning',
       dayCountModalIntro: 'Detta styr hur årsräntan omvandlas till ränta över tid.',
       dayCountActual365Help: 'Standard för nya lån. Ränta räknas på verkliga dagar och ett 365-dagars år. Bra för lån mellan familj och vänner eftersom varje faktisk dag räknas naturligt.',
@@ -411,6 +414,7 @@ const LanguageService = {
       dayCountActual360Card: 'Verkliga kalenderdagar och ett 360-dagars år. Vanligt i vissa kommersiella lån.',
       learnInterestCalculation: 'Läs hur ränteberäkningen fungerar',
       interestCalculationGuide: 'Guide till ränteberäkning',
+      changeCalculation: 'Ändra',
       dayCountMore: 'Mer om ränteberäkning',
       interestChanges: 'Ränteförändringar',
       loanChanges: 'Låneförändringar',
@@ -787,6 +791,9 @@ const LanguageService = {
       dayCountActual365Short: 'Actual/365',
       dayCountThirty360Short: '30/360',
       dayCountActual360Short: 'Actual/360',
+      dayCountActual365Summary: 'Real calendar days',
+      dayCountThirty360Summary: 'Simple for monthly agreements',
+      dayCountActual360Summary: 'Common in commercial loans',
       dayCountModalTitle: 'Choose interest calculation',
       dayCountModalIntro: 'This controls how annual interest is converted into interest over time.',
       dayCountActual365Help: 'Default for new loans. Interest uses real calendar days and a 365-day year. Good for family and friend loans because each actual day counts naturally.',
@@ -797,6 +804,7 @@ const LanguageService = {
       dayCountActual360Card: 'Real calendar days and a 360-day year. Common in some commercial loans.',
       learnInterestCalculation: 'Learn how interest calculation works',
       interestCalculationGuide: 'Interest calculation guide',
+      changeCalculation: 'Change',
       dayCountMore: 'More about interest calculation',
       interestChanges: 'Interest Changes',
       loanChanges: 'Loan Changes',
@@ -1477,6 +1485,7 @@ function updateDayCountHelp() {
   const select = document.getElementById("loanDayCountConvention");
   const help = document.getElementById("day-count-help");
   const selectedTitle = document.getElementById("day-count-selected-title");
+  const selectedSummary = document.getElementById("day-count-selected-summary");
   if (!select) return;
   const key = select.value === "actual360"
     ? "dayCountActual360Help"
@@ -1485,6 +1494,7 @@ function updateDayCountHelp() {
       : "dayCountActual365Help";
   if (help) help.textContent = LanguageService.translate(key);
   if (selectedTitle) selectedTitle.textContent = formatDayCountConventionShort(select.value);
+  if (selectedSummary) selectedSummary.textContent = formatDayCountConventionSummary(select.value);
   document.querySelectorAll(".day-count-option").forEach(option => {
     const selected = option.getAttribute("data-day-count") === select.value;
     option.classList.toggle("selected", selected);
@@ -1501,6 +1511,13 @@ function formatDayCountConventionShort(value) {
   if (convention === "actual360") return LanguageService.translate("dayCountActual360Short");
   if (convention === "thirty360") return LanguageService.translate("dayCountThirty360Short");
   return LanguageService.translate("dayCountActual365Short");
+}
+
+function formatDayCountConventionSummary(value) {
+  const convention = LendpileCalculations.normalizeDayCountConvention(value, "thirty360");
+  if (convention === "actual360") return LanguageService.translate("dayCountActual360Summary");
+  if (convention === "thirty360") return LanguageService.translate("dayCountThirty360Summary");
+  return LanguageService.translate("dayCountActual365Summary");
 }
 
 /********************************************************

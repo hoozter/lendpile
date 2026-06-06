@@ -184,11 +184,13 @@
                 <option value="actual360" data-translate="dayCountActual360">Actual/360 - commercial</option>
               </select>
               <button type="button" id="day-count-open-btn" class="day-count-open-btn">
-                <span id="day-count-selected-title">Actual/365</span>
-                <span class="material-icons" aria-hidden="true">expand_more</span>
+                <span class="day-count-selected-copy">
+                  <span id="day-count-selected-title" class="day-count-selected-title">Actual/365</span>
+                  <span id="day-count-selected-summary" class="day-count-selected-summary">Real calendar days</span>
+                </span>
+                <span class="day-count-change" data-translate="changeCalculation">Change</span>
               </button>
               <p class="form-section-help" id="day-count-help"></p>
-              <p class="form-section-help"><a href="faq.html#interest-calculation" target="_blank" rel="noopener noreferrer" data-translate="learnInterestCalculation">Learn how interest calculation works</a></p>
             </div>
           </div>
         </div>
@@ -221,7 +223,7 @@
     <div class="modal-content day-count-modal-content">
       <span class="btn-close">&times;</span>
       <h2 class="modal-main-title" data-translate="dayCountModalTitle">Choose interest calculation</h2>
-      <p class="account-field-help" data-translate="dayCountModalIntro">This controls how annual interest is converted into interest over time.</p>
+      <p class="day-count-modal-intro" data-translate="dayCountModalIntro">This controls how annual interest is converted into interest over time.</p>
       <div class="day-count-options" role="radiogroup" aria-label="Interest calculation">
         <button type="button" class="day-count-option" data-day-count="actual365">
           <span class="day-count-option-title" data-translate="dayCountActual365Short">Actual/365</span>
