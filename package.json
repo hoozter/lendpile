@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "write-config": "node scripts/write-config.js"
+    "write-config": "node scripts/write-config.js",
+    "build:pages": "node scripts/build-pages.js"
   }
 }

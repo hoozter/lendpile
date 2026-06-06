@@ -59,12 +59,14 @@ The Worker verifies JWTs using Neon JWKS. It does not trust decoded JWT payloads
 
 ## Cloudflare Pages
 
-- Build command: `npm install && node scripts/write-config.js`
-- Output directory: `/`
+- Build command: `npm ci && npm run build:pages`
+- Output directory: `dist`
 - Pages environment variables:
   - `LENDPILE_API_URL`
   - `NEON_AUTH_URL`
   - Optional `ADMIN_API_URL`
+
+The Pages build copies only public browser files into `dist`, so repo-only files such as `.gitignore`, `neonconnect.txt`, `worker/`, and `neon/` are not published as static assets.
 
 ## Preserving Existing Lendpile Users
 

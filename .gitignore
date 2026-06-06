@@ -3,6 +3,7 @@ config.js
 neonconnect.txt
 node_modules/
 worker/node_modules/
+dist/
 .agents/
 .claude/
 skills-lock.json
