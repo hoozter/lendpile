@@ -78,8 +78,9 @@ async function apiFetch(path, options = {}) {
     await loadNeonSession().catch(() => null);
     session = currentSessionFromToken();
   }
+  if (!session?.access_token) throw new Error("Not authenticated");
   const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
-  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+  headers.Authorization = `Bearer ${session.access_token}`;
   const res = await fetch(`${LENDPILE_API_URL}${path}`, Object.assign({}, options, { headers, credentials: "include" }));
   const body = (await res.json().catch(() => ({}))) || {};
   if (!res.ok) throw new Error(body.error || body.message || `Request failed (${res.status})`);
@@ -2724,6 +2725,7 @@ const UIHandler = {
     const banner = document.getElementById("transfer-offer-banner");
     if (!banner) return;
     if (sessionStorage.getItem("offlineMode")) { banner.style.display = "none"; return; }
+    if (!(await AuthService.getUser())) { banner.style.display = "none"; banner.innerHTML = ""; return; }
     const result = await ShareService.listTransferOffers();
     const offers = result.offers || [];
     if (offers.length === 0) {
@@ -2775,6 +2777,7 @@ const UIHandler = {
     const banner = document.getElementById("edit-request-banner");
     if (!banner) return;
     if (sessionStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+    if (!(await AuthService.getUser())) { banner.style.display = "none"; banner.innerHTML = ""; return; }
     const result = await ShareService.listMyShares();
     const shares = (result.shares || []).filter(s => s.edit_requested_at);
     if (shares.length === 0) {
@@ -2828,6 +2831,7 @@ const UIHandler = {
     const banner = document.getElementById("edit-resolution-banner");
     if (!banner) return;
     if (sessionStorage.getItem("offlineMode")) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+    if (!(await AuthService.getUser())) { banner.style.display = "none"; banner.innerHTML = ""; return; }
     const result = await ShareService.listSharesReceived();
     const unseen = (result.shares || []).filter(s => s.edit_request_resolved_at && !s.recipient_seen_resolution_at);
     if (unseen.length === 0) {
@@ -2875,6 +2879,12 @@ const UIHandler = {
     const loans = StorageService.load("loanData") || [];
     const loan = loans[loanIndex];
     if (!loan || loan.id == null) {
+      linksSection.classList.add("hidden");
+      sharesSection.classList.add("hidden");
+      return;
+    }
+    const user = await AuthService.getUser();
+    if (!user) {
       linksSection.classList.add("hidden");
       sharesSection.classList.add("hidden");
       return;
