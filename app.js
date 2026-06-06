@@ -56,10 +56,10 @@ function currentSessionFromToken() {
 async function loadNeonSession() {
   if (!NEON_AUTH_URL) return { error: new Error("Neon Auth URL not configured"), data: null };
   const res = await fetch(`${NEON_AUTH_URL}/get-session`, { method: "GET", credentials: "include" });
-  const body = await res.json().catch(() => ({}));
+  const body = (await res.json().catch(() => ({}))) || {};
   if (!res.ok || !body?.user) {
     clearStoredToken();
-    return { error: new Error(body.message || body.error || "No active auth session"), data: null };
+    return { error: new Error(body?.message || body?.error || "No active auth session"), data: null };
   }
   const jwt = res.headers.get("set-auth-jwt");
   if (!jwt) return { error: new Error("Neon Auth did not return a JWT"), data: null };
@@ -81,7 +81,7 @@ async function apiFetch(path, options = {}) {
   const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
   if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
   const res = await fetch(`${LENDPILE_API_URL}${path}`, Object.assign({}, options, { headers, credentials: "include" }));
-  const body = await res.json().catch(() => ({}));
+  const body = (await res.json().catch(() => ({}))) || {};
   if (!res.ok) throw new Error(body.error || body.message || `Request failed (${res.status})`);
   return body;
 }
@@ -117,7 +117,7 @@ const AuthService = {
       credentials: "include",
       body: JSON.stringify({ email, password, rememberMe: true, callbackURL: window.location.pathname || "/app.html" })
     });
-    const body = await res.json().catch(() => ({}));
+    const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Login failed" };
     const session = await loadNeonSession();
     if (session.error) return { success: false, error: session.error.message };
@@ -132,7 +132,7 @@ const AuthService = {
       credentials: "include",
       body: JSON.stringify({ email, password, name: displayName || email.split("@")[0], callbackURL: window.location.pathname || "/app.html" })
     });
-    const body = await res.json().catch(() => ({}));
+    const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Signup failed" };
     setCachedProfile({ display_name: displayName || "" });
     const session = await loadNeonSession();
@@ -146,7 +146,7 @@ const AuthService = {
       credentials: "include",
       body: JSON.stringify({ email, type: "email-verification" })
     });
-    const body = await res.json().catch(() => ({}));
+    const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Could not resend verification code" };
     return { success: true, data: body };
   },
@@ -158,7 +158,7 @@ const AuthService = {
       credentials: "include",
       body: JSON.stringify({ email, otp: code })
     });
-    const body = await res.json().catch(() => ({}));
+    const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Could not verify email" };
     const session = await loadNeonSession();
     await this.refreshProfile();
@@ -260,7 +260,7 @@ const ShareService = {
     if (!LENDPILE_API_URL) return { error: "Lendpile API not configured." };
     try {
       const res = await fetch(`${LENDPILE_API_URL}/shares/preview/${encodeURIComponent(token)}`, { credentials: "include" });
-      const body = await res.json().catch(() => ({}));
+      const body = (await res.json().catch(() => ({}))) || {};
       if (!res.ok) return { error: body.error || "Link expired or invalid." };
       return { data: body.preview || null };
     } catch (e) { return { error: e.message || "Link expired or invalid." }; }
