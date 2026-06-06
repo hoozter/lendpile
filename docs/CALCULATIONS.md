@@ -1,62 +1,94 @@
-# Lendpile – Calculation reference
+# Lendpile - Calculation reference
 
-How the app’s loan and amortization calculations work, for verification against Excel or a bank statement.
+This document describes the calculation contract covered by `npm test`.
 
----
+## Interest Calculation Options
 
-## 1. Data model (inputs)
+Lendpile supports three day-count conventions:
 
-- **Loan**: `startDate`, `initialAmount`, `interestRate` (annual %), `currency`, `interestChanges[]`, `loanChanges[]`, `payments[]`.
-- **Interest change**: `date`, `rate` (new annual %).
-- **Loan change**: `date`, `amount` (positive = debt increases, negative = debt decreases).
-- **Payment** (amortization): `type` ("scheduled" | "one-time"), `amount`, `startDate`, `endDate` (optional), `frequency` (for scheduled: 1 = every month, 2 = every 2 months, …), `dayOfMonth` (day of month for payment).
+- **Actual/365 - real calendar days.** Interest accrues by actual elapsed days using a 365-day year. This is the default for newly created loans and is a good fit for family/friend loans because every real day counts naturally.
+- **30/360 - simple monthly.** Every month counts as 30 days and the year as 360 days. This is simple and predictable. Existing loans that do not yet store a convention keep this legacy Lendpile behavior.
+- **Actual/360 - commercial.** Interest accrues by actual elapsed days using a 360-day year. This is common in some commercial/money-market contexts and usually charges slightly more interest than Actual/365.
 
----
+## What "Correct" Means
 
-## 2. Timeline (month-by-month)
+The user-entered loan details define the contract: loan amount, interest rates, loan changes, amortization payments, and the selected interest calculation convention. Once those inputs are defined, the calculation is mathematically provable.
 
-The app builds a **timeline**: one row per calendar month from the loan start until debt reaches zero or 600 months.
+The test suite proves the ledger equations:
 
-For each month the code:
+- Interest is never negative.
+- Payments and amortization are never negative.
+- Debt never goes below zero.
+- Each row's ending debt balances from its starting debt, applied loan changes, amortization, and any capitalized unpaid interest.
+- A synthetic exported legacy loan stays locked to the current 30/360-style Lendpile numbers.
+- Generated random loans are checked against the balance invariants.
 
-1. **Interest rate**  
-   If there was an interest change in the **previous** month, the **new** rate is applied **this** month. Change dated March → new rate from **April** onward (not March). Convention: “rate change effective from the start of the next period.”
+Run:
 
-2. **Loan amount changes**  
-   All loan changes with `date` in or before the **current** month are applied at the **start** of the current month (before interest and payment). Change dated March 15 → debt adjusted when processing **March**. Multiple changes in the same month are applied in date order.
+```sh
+npm test
+```
 
-3. **Interest**  
-   `startingDebt` = debt at start of month (after loan changes). `monthRate = annualRate / 100 / 12`. `interest = startingDebt * monthRate`.
+## 30/360 Live-Legacy Convention
 
-4. **Payment**  
-   Sum of all amortization payments in this month: **One-time** only in the month of `startDate`. **Scheduled** if `(currentMonth - paymentStartMonth) % frequency === 0` and current month is between start and end (if set).
+30/360 preserves the original Lendpile model:
 
-5. **Amortization and new balance**  
-   `principalPaid = max(0, min(payment - interest, currentDebt))`. Unpaid interest when payment < interest: `unpaidInterest = max(0, interest - payment)`; it is **capitalized** (added to balance). `endingDebt = currentDebt - principalPaid + unpaidInterest` (balance can increase when payment < interest).
+- Interest uses `annualRate / 12` for the month.
+- Interest changes are detected in their dated month and applied from the next timeline row.
+- Loan amount changes are applied in their dated month before monthly interest is calculated.
+- Payments are summed for the month. Monthly schedules use their month cadence; weekly and daily schedules count actual occurrences in the month.
+- Payments cover monthly interest first, then reduce principal.
+- If payment is smaller than interest, unpaid interest is capitalized into the balance.
+- Final overpayments are capped for display to the amount actually needed.
 
-6. **Overpayment**  
-   When debt reaches zero and `payment > startingDebt + interest`, the row is marked as overpayment and the “actual needed” amount is stored for display.
+The synthetic export in `test/fixtures/legacy-example-loan.json` locks known legacy behavior:
 
-7. **Next month**  
-   Advance by one month; loop until debt = 0 or 600 months.
+- Remaining debt as of January 31, 2026: about `137,517 SEK`.
+- Remaining forecast months from January 31, 2026: `185`.
+- Total interest across the full 30/360-style timeline: about `36,917 SEK`.
 
----
+## Actual/365 And Actual/360 Date-Event Conventions
 
-## 3. Scheduled payment timing
+Actual/365 and Actual/360 are date-aware:
 
-Payment with `startDate` in month M and `frequency` F is included in months M, M+F, M+2F, … The first scheduled payment is in the **start month** of the payment.
+- The first period starts on the loan start date.
+- Interest accrues between dated events.
+- Interest changes take effect on their stated date.
+- Loan changes take effect on their stated date.
+- Payments take effect on their payment date and first cover accrued interest, then principal.
+- Unpaid interest is capitalized at month end.
 
----
+The only difference between Actual/365 and Actual/360 is the denominator:
 
-## 4. “Current” summary on the loan card
+- Actual/365: `interest = debt * annualRate * actualDays / 365`
+- Actual/360: `interest = debt * annualRate * actualDays / 360`
 
-- **Historical:** Last row with `date < today`; its `endingDebt` is “remaining debt.”
-- **When there is no historical row:** Remaining debt is `initialAmount + sum of ALL loanChanges[].amount`. All future loan changes are included; intended behaviour may be to restrict to changes with `date <= today` (candidate fix).
+## Comparison Tool
 
----
+Run this comparison against an export:
 
-## 5. Conventions to confirm
+```sh
+npm run compare:calculations -- test/fixtures/legacy-example-loan.json 2026-01-31
+```
 
-- **Interest change timing:** App uses “next month” (change in March → new rate from April). Confirm this matches your use case.
-- **Payment < interest:** Unpaid interest is capitalized (balance grows). Some contracts do not capitalize; match as needed.
-- **Loan change sign:** `amount > 0` = debt increases (e.g. drawdown), `amount < 0` = debt decreases (e.g. one-off repayment).
+The comparison is useful when deciding whether a legacy loan should stay on 30/360 or be switched to Actual/365/Actual/360.
+
+## Payment Scheduling
+
+- One-time payments occur only on `startDate`.
+- Monthly scheduled payments occur on `dayOfMonth`, clamped to the last day for shorter months.
+- `lastWeekdayOfMonth` schedules the last weekday in each month.
+- Weekly payments repeat every `frequency * 7` days from `startDate`.
+- Daily payments repeat every `frequency` days from `startDate`.
+- Payment breakdowns and chart data count occurrences inside each month.
+
+## Bank-Like Conventions To Keep Reviewing
+
+Conventions that can differ between lenders and should be decided before changing behavior:
+
+- Monthly `annualRate / 12` vs Actual/365 vs Actual/360.
+- Whether interest changes apply the same day, the next month, or from the next payment/statement period.
+- Whether payments are applied before interest, after interest, or prorated by payment date.
+- Whether interest is rounded monthly, daily, or only at statement/payment time.
+- Whether unpaid interest is capitalized immediately, monthly, separately tracked, or not allowed.
+- Whether lenders apply payments at beginning of day, end of day, or with settlement delays.

@@ -24,6 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <!-- Config (copy config.example.js to config.js; config.js is gitignored) -->
   <script src="config.js"></script>
+  <script src="calculations.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -173,6 +174,18 @@
           <div class="form-row hidden" id="loan-initial-interest-row">
             <label for="loanInitialInterestRate" data-translate="initialInterestRate">Initial interest rate (%)</label>
             <input type="number" id="loanInitialInterestRate" step="any" min="0" placeholder="e.g. 4.5" />
+          </div>
+          <div class="form-row">
+            <label for="loanDayCountConvention" data-translate="dayCountConvention">Interest calculation:</label>
+            <div class="loan-field-wrap">
+              <select id="loanDayCountConvention" required>
+                <option value="actual365" data-translate="dayCountActual365">Actual/365 - real calendar days (default)</option>
+                <option value="thirty360" data-translate="dayCountThirty360">30/360 - simple monthly</option>
+                <option value="actual360" data-translate="dayCountActual360">Actual/360 - commercial</option>
+              </select>
+              <p class="form-section-help" id="day-count-help"></p>
+              <p class="form-section-help"><a href="faq.html#interest-calculation" target="_blank" rel="noopener noreferrer" data-translate="learnInterestCalculation">Learn how interest calculation works</a></p>
+            </div>
           </div>
         </div>
         <div class="modal-section">
@@ -556,6 +569,7 @@
         <h4 class="modal-section-title" data-translate="privacyAndLegal">Privacy &amp; legal</h4>
         <p class="start-page-description"><a href="privacy.html" target="_blank" rel="noopener noreferrer" data-translate="privacyPolicy">Privacy policy &amp; GDPR</a></p>
         <p class="start-page-description"><a href="faq.html" target="_blank" rel="noopener noreferrer" data-translate="helpAndFaq">Help &amp; FAQ</a></p>
+        <p class="start-page-description"><a href="faq.html#interest-calculation" target="_blank" rel="noopener noreferrer" data-translate="interestCalculationGuide">Interest calculation guide</a></p>
         <p class="start-page-description start-page-description-spaced"><a href="https://github.com/hoozter/lendpile" target="_blank" rel="noopener noreferrer" data-translate="sourceCode">Source code (GitHub)</a></p>
       </div>
     </div>

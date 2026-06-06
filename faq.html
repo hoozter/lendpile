@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light dark" />
   <title>Help &amp; FAQ – Lendpile</title>
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
@@ -30,7 +29,7 @@
       }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; max-width: 720px; margin: 0 auto; min-height: 100vh; }
+    body { font-family: Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; max-width: 860px; margin: 0 auto; min-height: 100vh; }
     h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
     h2 { font-size: 1.05rem; margin-top: 1.25rem; margin-bottom: 0.35rem; color: var(--link); }
     p, li { margin-bottom: 0.6rem; }
@@ -41,6 +40,14 @@
     .intro { margin-bottom: 1.25rem; opacity: 0.9; }
     .faq-section { margin-bottom: 1rem; }
     .faq-privacy-link { margin-top: 1.5rem; }
+    .toc { background: var(--box-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin: 1rem 0 1.5rem; }
+    .toc strong { display: block; margin-bottom: 0.35rem; }
+    .toc a { display: inline-block; margin: 0 1rem 0.35rem 0; }
+    .info-box { background: var(--box-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin: 0.75rem 0; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1rem; font-size: 0.95rem; }
+    .comparison-table th, .comparison-table td { border: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: top; }
+    .comparison-table th { background: var(--box-bg); }
+    code { background: var(--box-bg); padding: 0.1rem 0.25rem; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -49,9 +56,57 @@
   <h1>Help &amp; FAQ</h1>
   <p class="intro">How to use Lendpile: add loans, set interest and amortization, and see your schedule.</p>
 
-  <div class="faq-section">
+  <nav class="toc" aria-label="FAQ sections">
+    <strong>Jump to</strong>
+    <a href="#interest-calculation">Interest calculation</a>
+    <a href="#loan-setup">Loan setup</a>
+    <a href="#amortization">Amortization</a>
+    <a href="#sharing">Sharing</a>
+    <a href="#data">Data</a>
+  </nav>
+
+  <div class="faq-section" id="interest-calculation">
+    <h2>How does Lendpile calculate interest?</h2>
+    <p>Lendpile calculates from the loan details you enter: start date, amount, interest rates, interest changes, loan changes, payments, and the selected interest calculation method. Once those inputs are defined, each row follows a ledger equation: starting debt, plus any loan increases and unpaid interest, minus principal paid, equals ending debt.</p>
+    <p>New loans default to <strong>Actual/365</strong>. Existing older loans that were created before this setting keep the old <strong>30/360</strong> style unless you edit the loan and choose another method.</p>
+    <div class="info-box">
+      <p><strong>Short version:</strong> choose <strong>Actual/365</strong> for most personal or family/friend loans, <strong>30/360</strong> for simple monthly agreements, and <strong>Actual/360</strong> only when your agreement specifically uses that commercial convention.</p>
+    </div>
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>How it works</th>
+          <th>Usually useful for</th>
+          <th>Tradeoff</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Actual/365</strong></td>
+          <td>Uses real calendar days and divides by 365: <code>debt * rate * days / 365</code>.</td>
+          <td>Family/friend loans and personal agreements where every real day should count naturally.</td>
+          <td>Most intuitive, but monthly interest can vary because months have different lengths.</td>
+        </tr>
+        <tr>
+          <td><strong>30/360</strong></td>
+          <td>Treats each month as 30 days and the year as 360 days. For a full month this is the same as <code>rate / 12</code>.</td>
+          <td>Simple monthly agreements and older Lendpile loans.</td>
+          <td>Very predictable, but not based on actual calendar days.</td>
+        </tr>
+        <tr>
+          <td><strong>Actual/360</strong></td>
+          <td>Uses real calendar days and divides by 360: <code>debt * rate * days / 360</code>.</td>
+          <td>Commercial or money-market-style lending when the agreement says Actual/360.</td>
+          <td>Usually charges slightly more interest than Actual/365 for the same rate and dates.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="faq-section" id="loan-setup">
     <h2>How do I add a loan?</h2>
-    <p>Click <strong>Add Loan</strong> on the main screen. Enter the loan name, start date, amount, currency, and at least one interest rate (with a date). For a fixed rate from the start, one row is enough. Save when done.</p>
+    <p>Click <strong>Add Loan</strong> on the main screen. Enter the loan name, start date, amount, currency, interest calculation method, and at least one interest rate with a date. For a fixed rate from the start, one interest row is enough. Save when done.</p>
   </div>
 
   <div class="faq-section">
@@ -64,7 +119,7 @@
     <p>Loan changes are extra drawdowns or repayments that change the principal (the amount you owe). Add them in the <strong>Loan changes</strong> section with a date and amount (positive for more borrowing, negative for a repayment). They affect the remaining debt and the rest of the schedule.</p>
   </div>
 
-  <div class="faq-section">
+  <div class="faq-section" id="amortization">
     <h2>How do I add an amortization schedule?</h2>
     <p>Open a loan, go to the <strong>Amortizations</strong> tab, and click <strong>Add Amortization</strong>. Choose <strong>One-time</strong> for a single extra payment on a date, or <strong>Scheduled</strong> for recurring payments (e.g. monthly on the 27th). Set amount, start date, and optionally an end date.</p>
   </div>
@@ -79,12 +134,12 @@
     <p>It’s the total payment due in the <em>current</em> month. If a schedule hasn’t started yet (e.g. starts next month), this month’s value can be zero while the amortization card still shows the future monthly amount and when it starts.</p>
   </div>
 
-  <div class="faq-section">
+  <div class="faq-section" id="sharing">
     <h2>How do I share a loan with someone?</h2>
     <p>Open the loan, open the three-dot menu (top right), and choose <strong>Share loan</strong>. Create a link and set whether the recipient can only <strong>view</strong> or can <strong>edit</strong>. Send them the link. When they open it, they see who shared it and which loan before signing in. After they sign in, the shared loan appears in their list (one source of truth—they see your loan, not a copy). You can revoke or change the link later from the same Share loan dialog (under “Active links for this loan”). The recipient can remove the share from their list (three-dot menu → <strong>Remove from my list</strong>), which revokes it for everyone.</p>
   </div>
 
-  <div class="faq-section">
+  <div class="faq-section" id="data">
     <h2>I have view-only access to a shared loan. What can I do?</h2>
     <p>You can open the loan and use the three-dot menu: <strong>Edit</strong> opens the loan form in read-only mode (all fields are locked so you can see everything but not change it). There you’ll see “View-only. Request edit access from [owner]?” and a <strong>Request edit access</strong> button. If you click it, the owner will see your request when they next open the app (in a banner and in the Share loan dialog for that loan). They can approve or decline. After they decide, you’ll see a banner on your next login or refresh: “Your edit access request was approved” or “was declined.” If approved, you’ll then have edit access and can save changes to the owner’s loan. You can also <strong>Duplicate</strong> to add a copy to your own loans, or <strong>Remove from my list</strong> to revoke the share.</p>
   </div>

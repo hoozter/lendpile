@@ -394,6 +394,15 @@ const LanguageService = {
       interestRate: 'Ränta (%)',
       currency: 'Valuta',
       interest: 'Ränta',
+      dayCountConvention: 'Ränteberäkning:',
+      dayCountActual365: 'Actual/365 - verkliga kalenderdagar (standard)',
+      dayCountThirty360: '30/360 - enkel månadsränta',
+      dayCountActual360: 'Actual/360 - kommersiell',
+      dayCountActual365Help: 'Standard för nya lån. Ränta räknas på verkliga dagar och ett 365-dagars år. Bra för lån mellan familj och vänner eftersom varje faktisk dag räknas naturligt.',
+      dayCountThirty360Help: 'Varje månad räknas som 30 dagar och året som 360 dagar. Enkelt, förutsägbart och vanligt i vissa avtal, men följer inte den faktiska kalendern.',
+      dayCountActual360Help: 'Ränta räknas på verkliga dagar men med ett 360-dagars år. Vanligt i kommersiella sammanhang och ger oftast något högre ränta än Actual/365.',
+      learnInterestCalculation: 'Läs hur ränteberäkningen fungerar',
+      interestCalculationGuide: 'Guide till ränteberäkning',
       interestChanges: 'Ränteförändringar',
       loanChanges: 'Låneförändringar',
       removeLoan: 'Ta bort Lån',
@@ -542,6 +551,8 @@ const LanguageService = {
       everyMonthsPayment: 'Var {freq} månad',
       weeklyPayment: 'Veckobetalning',
       everyWeeksPayment: 'Var {freq} vecka',
+      dailyPayment: 'Daglig betalning',
+      everyDaysPayment: 'Var {freq} dag',
       loginTitle: 'Logga in',
       loginSubtitle: 'Logga in för att synka dina lån mellan enheter.',
       email: 'E-post',
@@ -760,6 +771,15 @@ const LanguageService = {
       interestRate: 'Interest Rate (%)',
       currency: 'Currency',
       interest: 'Interest',
+      dayCountConvention: 'Interest calculation:',
+      dayCountActual365: 'Actual/365 - real calendar days (default)',
+      dayCountThirty360: '30/360 - simple monthly',
+      dayCountActual360: 'Actual/360 - commercial',
+      dayCountActual365Help: 'Default for new loans. Interest uses real calendar days and a 365-day year. Good for family and friend loans because each actual day counts naturally.',
+      dayCountThirty360Help: 'Every month counts as 30 days and the year as 360 days. Simple, predictable, and common in some contracts, but not based on the actual calendar.',
+      dayCountActual360Help: 'Interest uses real calendar days but a 360-day year. Common in commercial contexts and usually charges slightly more interest than Actual/365.',
+      learnInterestCalculation: 'Learn how interest calculation works',
+      interestCalculationGuide: 'Interest calculation guide',
       interestChanges: 'Interest Changes',
       loanChanges: 'Loan Changes',
       removeLoan: 'Remove Loan',
@@ -908,6 +928,8 @@ const LanguageService = {
       everyMonthsPayment: 'Every {freq} Months',
       weeklyPayment: 'Weekly payment',
       everyWeeksPayment: 'Every {freq} weeks',
+      dailyPayment: 'Daily payment',
+      everyDaysPayment: 'Every {freq} days',
       loginTitle: 'Log in',
       loginSubtitle: 'Sign in to sync your loans across devices.',
       email: 'Email',
@@ -1338,205 +1360,20 @@ function isStrongPassword(p) {
  ********************************************************/
 const CalculationService = {
   getMonthlyPaymentBreakdown(loan, d) {
-    let breakdown = {};
-    const currentDate = new Date(d.getFullYear(), d.getMonth(), 1);
-    const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    // Sort payments: one-time payments come first, then scheduled by start date.
-    const payments = (loan.payments || []).slice().sort((a, b) => {
-      if (a.type !== b.type) return a.type === "one-time" ? -1 : 1;
-      return new Date(a.startDate) - new Date(b.startDate);
+    return LendpileCalculations.getMonthlyPaymentBreakdown(loan, d, {
+      translate: key => LanguageService.translate(key)
     });
-    for (const p of payments) {
-      let ps = new Date(p.startDate);
-      ps.setHours(0, 0, 0, 0);
-      if (p.type === "one-time") {
-        if (ps.getFullYear() === d.getFullYear() && ps.getMonth() === d.getMonth()) {
-          const key = LanguageService.translate("oneTimeAmortization");
-          breakdown[key] = (breakdown[key] || 0) + p.amount;
-        }
-      } else {
-        if (ps > nextMonth) continue;
-        if (p.endDate) {
-          let pe = new Date(p.endDate);
-          pe.setHours(0, 0, 0, 0);
-          if (currentDate > pe) continue;
-        }
-        const unit = p.frequencyUnit || "month";
-        const freq = parseInt(p.frequency || "1", 10);
-
-        if (unit === "week") {
-          const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-          const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).getTime() + 86400000 - 1;
-          const paymentDates = getPaymentDates(p, loan.startDate);
-          let count = 0;
-          for (const t of paymentDates) {
-            if (t >= monthStart && t <= monthEnd) count++;
-          }
-          if (count > 0) {
-            const key = freq === 1
-              ? LanguageService.translate("weeklyPayment")
-              : LanguageService.translate("everyWeeksPayment").replace("{freq}", freq);
-            breakdown[key] = (breakdown[key] || 0) + p.amount * count;
-          }
-          continue;
-        }
-
-        const monthsDiff = (d.getFullYear() - ps.getFullYear()) * 12 + (d.getMonth() - ps.getMonth());
-        if (monthsDiff >= 0 && monthsDiff % freq === 0) {
-          let key = "";
-          if (freq === 1) key = LanguageService.translate("monthlyPayment");
-          else if (freq === 2) key = LanguageService.translate("biMonthlyPayment");
-          else if (freq === 3) key = LanguageService.translate("triMonthlyPayment");
-          else key = LanguageService.translate("everyMonthsPayment").replace("{freq}", freq);
-          breakdown[key] = (breakdown[key] || 0) + p.amount;
-        }
-      }
-    }
-    let total = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
-    return { total, breakdown };
   },
   buildTimeline(loan) {
-    if (!loan.startDate) return [];
-    const timeline = [];
-    let start = new Date(loan.startDate);
-    start.setHours(0, 0, 0, 0);
-    const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
-    const interestChanges = (loan.interestChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
-    const loanChanges = (loan.loanChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
-    let icIndex = 0;
-    let lcIndex = 0;
-    let currentDebt = loan.initialAmount || 0;
-    let currentRate = loan.interestRate || 0;
-    /* Apply all interest changes dated before loan start so rate and index match timeline at start */
-    while (icIndex < interestChanges.length) {
-      const icDate = new Date(interestChanges[icIndex].date);
-      const icMonth = new Date(icDate.getFullYear(), icDate.getMonth(), 1);
-      if (icMonth >= startMonth) break;
-      currentRate = parseFloat(interestChanges[icIndex].rate);
-      icIndex++;
-    }
-    let currentDate = new Date(start);
-    let monthsCount = 0;
-    let pendingInterestChange = null;
-    while (monthsCount < 600 && currentDebt > 0) {
-      const changesThisMonth = [];
-      if (pendingInterestChange !== null) {
-        const prevRate = currentRate;
-        currentRate = pendingInterestChange;
-        pendingInterestChange = null;
-        if (prevRate !== currentRate) changesThisMonth.push({ type: "interest", value: currentRate });
-      }
-      if (icIndex < interestChanges.length) {
-        let icDate = new Date(interestChanges[icIndex].date);
-        if (icDate.getFullYear() === currentDate.getFullYear() && icDate.getMonth() === currentDate.getMonth()) {
-          const newRate = parseFloat(interestChanges[icIndex].rate);
-          if (newRate === currentRate) {
-            currentRate = newRate;
-          } else {
-            pendingInterestChange = newRate;
-          }
-          icIndex++;
-        }
-      }
-      while (lcIndex < loanChanges.length) {
-        let lcDate = new Date(loanChanges[lcIndex].date);
-        if (lcDate.getFullYear() < currentDate.getFullYear() ||
-            (lcDate.getFullYear() === currentDate.getFullYear() && lcDate.getMonth() <= currentDate.getMonth())) {
-          currentDebt += parseFloat(loanChanges[lcIndex].amount);
-          changesThisMonth.push({ type: "loan", value: parseFloat(loanChanges[lcIndex].amount) });
-          lcIndex++;
-        } else {
-          break;
-        }
-      }
-      const startingDebt = currentDebt;
-      const monthRate = currentRate / 100 / 12;
-      const interest = startingDebt * monthRate;
-      const paymentInfo = CalculationService.getMonthlyPaymentBreakdown(loan, currentDate);
-      const payment = paymentInfo.total;
-      const principalPaid = Math.max(0, Math.min(payment - interest, currentDebt));
-      const unpaidInterest = Math.max(0, interest - payment);
-      currentDebt = Math.max(0, currentDebt - principalPaid + unpaidInterest);
-      if (currentDebt === 0 && payment > (startingDebt + interest)) {
-        paymentInfo.isOverpayment = true;
-        paymentInfo.actualNeeded = startingDebt + interest;
-        paymentInfo.plannedPayment = payment;
-      }
-      let paymentDate = new Date(currentDate);
-      const activePayment = loan.payments.find(p => {
-        let pStart = new Date(p.startDate); pStart.setHours(0,0,0,0);
-        let pEnd = p.endDate ? new Date(p.endDate) : null;
-        if (pEnd) pEnd.setHours(0,0,0,0);
-        return pStart <= currentDate && (!pEnd || pEnd >= currentDate);
-      });
-      if (activePayment) {
-        const y = currentDate.getFullYear(), m = currentDate.getMonth();
-        if (activePayment.frequencyUnit === "week") {
-          const monthStart = new Date(y, m, 1);
-          const monthEnd = new Date(y, m + 1, 0);
-          const allInMonth = getPaymentDates(activePayment, loan.startDate)
-            .filter(t => { const d = new Date(t); return d >= monthStart && d <= monthEnd; });
-          paymentDate = allInMonth.length ? new Date(allInMonth[0]) : new Date(y, m, 1);
-        } else if (activePayment.lastWeekdayOfMonth) {
-          paymentDate = new Date(getLastWeekdayOfMonth(y, m));
-        } else {
-          paymentDate = new Date(y, m, 1);
-          const paymentDay = parseInt(activePayment.dayOfMonth) || new Date(activePayment.startDate).getDate();
-          const lastDayOfMonth = new Date(y, m + 1, 0).getDate();
-          paymentDate.setDate(Math.min(paymentDay, lastDayOfMonth));
-        }
-      }
-      const displayPayment = (paymentInfo.isOverpayment && paymentInfo.actualNeeded != null)
-        ? paymentInfo.actualNeeded
-        : payment;
-      timeline.push({
-        date: new Date(currentDate),
-        paymentDate: paymentDate,
-        startingDebt,
-        interestRate: currentRate,
-        changes: changesThisMonth,
-        interest,
-        payment: displayPayment,
-        paymentBreakdown: paymentInfo.breakdown,
-        amortization: principalPaid,
-        endingDebt: currentDebt,
-        isOverpayment: paymentInfo?.isOverpayment || false,
-        actualNeeded: paymentInfo?.actualNeeded || 0
-      });
-      currentDate.setMonth(currentDate.getMonth() + 1);
-      monthsCount++;
-    }
-    return timeline;
+    return LendpileCalculations.buildTimeline(loan, {
+      translate: key => LanguageService.translate(key)
+    });
   },
   /** Required monthly payment to pay off the loan by target date (single scheduled payment scenario). */
   calculatePaymentForTargetDate(loan, targetDateStr) {
-    if (!loan?.startDate || !targetDateStr) return null;
-    const start = new Date(loan.startDate);
-    start.setHours(0, 0, 0, 0);
-    const target = new Date(targetDateStr);
-    target.setHours(0, 0, 0, 0);
-    const targetMonth = new Date(target.getFullYear(), target.getMonth(), 1);
-    const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
-    if (targetMonth <= startMonth) return null;
-    const dayOfMonth = String(start.getDate());
-    let low = 0;
-    let high = (loan.initialAmount || 0) * 2 + 500000;
-    const tol = 1;
-    for (let iter = 0; iter < 60; iter++) {
-      const P = (low + high) / 2;
-      const loanCopy = {
-        ...loan,
-        payments: [{ type: 'scheduled', amount: P, startDate: loan.startDate, endDate: targetDateStr, frequency: 1, dayOfMonth }]
-      };
-      const timeline = this.buildTimeline(loanCopy);
-      if (!timeline.length) { low = P; continue; }
-      const last = timeline[timeline.length - 1];
-      const lastMonth = new Date(last.date.getFullYear(), last.date.getMonth(), 1);
-      if (last.endingDebt > 0.01 || lastMonth > targetMonth) low = P;
-      else high = P;
-      if (high - low < tol) break;
-    }
-    return Math.ceil((low + high) / 2 * 100) / 100;
+    return LendpileCalculations.calculatePaymentForTargetDate(loan, targetDateStr, {
+      translate: key => LanguageService.translate(key)
+    });
   }
 };
 
@@ -1544,59 +1381,10 @@ const CalculationService = {
  * Helper functions for payment validation
  ********************************************************/
 function getLastWeekdayOfMonth(year, month) {
-  const last = new Date(year, month + 1, 0);
-  const dow = last.getDay();
-  if (dow === 0) last.setDate(last.getDate() - 2);
-  else if (dow === 6) last.setDate(last.getDate() - 1);
-  return last.getTime();
+  return LendpileCalculations.getLastWeekdayOfMonth(year, month);
 }
 function getPaymentDates(payment, loanStartDate) {
-  const dates = [];
-  const unit = payment.frequencyUnit || "month";
-  const freq = parseInt(payment.frequency || "1", 10);
-  let start = new Date(payment.startDate);
-  start.setHours(0, 0, 0, 0);
-  const endDate = payment.endDate ? new Date(payment.endDate) : null;
-  if (endDate) endDate.setHours(23, 59, 59, 999);
-
-  if (unit === "week") {
-    const stepDays = freq * 7;
-    for (let i = 0; i < 600 * 7; i += stepDays) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      if (endDate && d > endDate) break;
-      dates.push(d.getTime());
-    }
-    return dates;
-  }
-
-  if (payment.lastWeekdayOfMonth) {
-    let y = start.getFullYear(), m = start.getMonth();
-    const startMonth = start.getTime();
-    for (let i = 0; i < 600; i++) {
-      const t = getLastWeekdayOfMonth(y, m);
-      if (t >= startMonth) {
-        if (endDate && t > endDate.getTime()) break;
-        dates.push(t);
-      }
-      m++;
-      if (m > 11) { m = 0; y++; }
-    }
-    return dates;
-  }
-
-  const dayOfMonth = parseInt(payment.dayOfMonth || start.getDate(), 10);
-  for (let i = 0; i < 600; i += freq) {
-    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    d.setDate(Math.min(dayOfMonth, lastDay));
-    d.setHours(0, 0, 0, 0);
-    if (d >= start) {
-      if (endDate && d > endDate) break;
-      dates.push(d.getTime());
-    }
-  }
-  return dates;
+  return LendpileCalculations.getPaymentDates(payment, loanStartDate);
 }
 function hasOverlappingDates(dates1, dates2) {
   return dates1.some(t1 => dates2.includes(t1));
@@ -1651,6 +1439,39 @@ function saveStartPageBlobs(blobs) {
 }
 function saveStartPageExcluded(names) {
   localStorage.setItem(START_PAGE_EXCLUDED_KEY, JSON.stringify(names));
+}
+
+function getLoanDebtFallbackAtDate(loan, asOfDate = new Date()) {
+  const cutoff = new Date(asOfDate);
+  cutoff.setHours(0, 0, 0, 0);
+  return (loan.initialAmount || 0) + (loan.loanChanges || []).reduce((sum, change) => {
+    const changeDate = new Date(change.date);
+    changeDate.setHours(0, 0, 0, 0);
+    return changeDate <= cutoff ? sum + (parseFloat(change.amount) || 0) : sum;
+  }, 0);
+}
+
+function getLoanDayCountConventionForDisplay(loan) {
+  return LendpileCalculations.normalizeDayCountConvention(loan?.dayCountConvention, "thirty360");
+}
+
+function updateDayCountHelp() {
+  const select = document.getElementById("loanDayCountConvention");
+  const help = document.getElementById("day-count-help");
+  if (!select || !help) return;
+  const key = select.value === "actual360"
+    ? "dayCountActual360Help"
+    : select.value === "thirty360"
+      ? "dayCountThirty360Help"
+      : "dayCountActual365Help";
+  help.textContent = LanguageService.translate(key);
+}
+
+function formatDayCountConvention(value) {
+  const convention = LendpileCalculations.normalizeDayCountConvention(value, "thirty360");
+  if (convention === "actual360") return LanguageService.translate("dayCountActual360");
+  if (convention === "thirty360") return LanguageService.translate("dayCountThirty360");
+  return LanguageService.translate("dayCountActual365");
 }
 
 /********************************************************
@@ -1767,6 +1588,7 @@ const UIHandler = {
         if (input) input.value = type;
       });
     });
+    document.getElementById("loanDayCountConvention")?.addEventListener("change", updateDayCountHelp);
     document.querySelectorAll(".btn-close").forEach(btn => {
       btn.addEventListener("click", ev => {
         const modal = ev.target.closest(".modal");
@@ -1949,9 +1771,12 @@ const UIHandler = {
     loans.forEach(loan => {
       const timeline = CalculationService.buildTimeline(loan);
       const historical = timeline.filter(row => row.date < today);
-      const currentRow = historical.length ? timeline[historical.length - 1] : (timeline[0] || null);
+      const firstRow = timeline[0] || null;
+      const currentRow = historical.length
+        ? timeline[historical.length - 1]
+        : (firstRow && firstRow.date <= today ? firstRow : null);
       const monthly = currentRow ? currentRow.payment : 0;
-      const debt = currentRow ? currentRow.endingDebt : (loan.initialAmount + (loan.loanChanges || []).reduce((s, c) => s + c.amount, 0));
+      const debt = currentRow ? currentRow.endingDebt : getLoanDebtFallbackAtDate(loan, today);
       const c = loan.currency || "SEK";
       if (!byCurrency[c]) byCurrency[c] = { monthlyTotal: 0, debtTotal: 0, count: 0 };
       byCurrency[c].monthlyTotal += monthly;
@@ -1967,7 +1792,7 @@ const UIHandler = {
     const forecast = fullTimeline.filter(row => row.date >= today);
     const historical = fullTimeline.filter(row => row.date < today);
     const currentRow = historical.length ? historical[historical.length - 1] : null;
-    const currentDebt = currentRow ? currentRow.endingDebt : (loan.initialAmount + (loan.loanChanges || []).reduce((sum, change) => sum + change.amount, 0));
+    const currentDebt = currentRow ? currentRow.endingDebt : getLoanDebtFallbackAtDate(loan, today);
     const monthsRemaining = forecast.length;
     const lastForecastRow = forecast.length ? forecast[forecast.length - 1] : null;
     const completionDate = lastForecastRow ? UIHandler.formatDate(lastForecastRow.paymentDate) : "-";
@@ -2197,7 +2022,7 @@ const UIHandler = {
     const historical = fullTimeline.filter(row => row.date < today);
     const forecast = fullTimeline.filter(row => row.date >= today);
     const currentRow = historical.length ? historical[historical.length - 1] : null;
-    const currentDebt = currentRow ? currentRow.endingDebt : (loan.initialAmount + (loan.loanChanges || []).reduce((sum, change) => sum + change.amount, 0));
+    const currentDebt = currentRow ? currentRow.endingDebt : getLoanDebtFallbackAtDate(loan, today);
     const currentRate = currentRow ? currentRow.interestRate : loan.interestRate || 0;
     const interestChangesSorted = (loan.interestChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
     const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -2242,6 +2067,7 @@ const UIHandler = {
     const statusRows = [
       { label: LanguageService.translate("startDate"), value: UIHandler.formatDate(loan.startDate) },
       { label: LanguageService.translate("initialAmount"), value: UIHandler.formatCurrency(loan.initialAmount, loan.currency) },
+      { label: LanguageService.translate("dayCountConvention"), value: formatDayCountConvention(loan.dayCountConvention) },
       { label: debtLabel, value: UIHandler.formatCurrency(currentDebt, loan.currency) },
       { label: LanguageService.translate("currentRate"), value: currentRate.toFixed(2) + "%" },
       ...(upcomingRateLabel ? [{ label: upcomingRateLabel, value: upcomingRateValue }] : [])
@@ -2359,7 +2185,9 @@ const UIHandler = {
         const unit = p.frequencyUnit || "month";
         const freq = parseInt(p.frequency || "1", 10);
         let key = "";
-        if (unit === "week") {
+        if (unit === "day") {
+          key = freq === 1 ? LanguageService.translate("dailyPayment") : LanguageService.translate("everyDaysPayment").replace("{freq}", freq);
+        } else if (unit === "week") {
           key = freq === 1 ? LanguageService.translate("weeklyPayment") : LanguageService.translate("everyWeeksPayment").replace("{freq}", freq);
         } else {
           if (freq === 1) key = LanguageService.translate("monthlyPayment");
@@ -2533,6 +2361,9 @@ const UIHandler = {
     if (payment.type !== "scheduled") return "-";
     const unit = payment.frequencyUnit || "month";
     const freq = parseInt(payment.frequency || "1", 10);
+    if (unit === "day") {
+      return freq === 1 ? LanguageService.translate("dailyPayment") : LanguageService.translate("everyDaysPayment").replace("{freq}", freq);
+    }
     if (unit === "week") {
       return freq === 1 ? LanguageService.translate("weeklyPayment") : LanguageService.translate("everyWeeksPayment").replace("{freq}", freq);
     }
@@ -3105,6 +2936,11 @@ const FormHandler = {
     document.getElementById("add-loan-change-btn").style.display = "";
     const subBtn = form.querySelector('button[type="submit"]');
     if (subBtn) subBtn.style.display = "";
+    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
+    });
+    form.querySelectorAll(".loan-type-toggle [data-loan-type]").forEach(btn => { btn.disabled = false; });
     form.reset();
     form.removeAttribute("data-loan-index");
     form.removeAttribute("data-edit-mode");
@@ -3127,6 +2963,8 @@ const FormHandler = {
       form.querySelector("#loanStartDate").value = loan.startDate;
       form.querySelector("#loanInitialAmount").value = loan.initialAmount;
       form.querySelector("#loanCurrency").value = loan.currency;
+      form.querySelector("#loanDayCountConvention").value = getLoanDayCountConventionForDisplay(loan);
+      updateDayCountHelp();
       const interestToShow = (() => {
         const sorted = (loan.interestChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
         const hasAtStart = sorted.length && sorted[0].date <= loan.startDate;
@@ -3198,6 +3036,8 @@ const FormHandler = {
       document.getElementById("loan-initial-interest-row").style.display = "flex";
       document.getElementById("loanInitialInterestRate").value = "";
       document.getElementById("loanInitialInterestRate").placeholder = LanguageService.currentLanguage === "sv" ? "t.ex. 4,5" : "e.g. 4.5";
+      document.getElementById("loanDayCountConvention").value = "actual365";
+      updateDayCountHelp();
       const interestHelp = document.getElementById("interest-section-help");
       interestHelp.textContent = LanguageService.translate("interestSectionHelpNewLoan");
       interestHelp.style.display = "block";
@@ -3226,6 +3066,11 @@ const FormHandler = {
     document.getElementById("add-loan-change-btn").style.display = "";
     const subBtn = form.querySelector('button[type="submit"]');
     if (subBtn) subBtn.style.display = "";
+    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
+    });
+    form.querySelectorAll(".loan-type-toggle [data-loan-type]").forEach(btn => { btn.disabled = false; });
     form.reset();
     form.removeAttribute("data-loan-index");
     form.removeAttribute("data-edit-mode");
@@ -3244,6 +3089,8 @@ const FormHandler = {
     form.querySelector("#loanStartDate").value = loan.startDate || "";
     form.querySelector("#loanInitialAmount").value = loan.initialAmount ?? "";
     form.querySelector("#loanCurrency").value = loan.currency || "SEK";
+    form.querySelector("#loanDayCountConvention").value = getLoanDayCountConventionForDisplay(loan);
+    updateDayCountHelp();
     const sharedInterestToShow = (() => {
       const sorted = (loan.interestChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
       const hasAtStart = sorted.length && sorted[0].date <= loan.startDate;
@@ -3334,7 +3181,9 @@ const FormHandler = {
     form.querySelector("#loanStartDate").value = loan.startDate || "";
     form.querySelector("#loanInitialAmount").value = loan.initialAmount ?? "";
     form.querySelector("#loanCurrency").value = loan.currency || "SEK";
-    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency"].forEach(id => {
+    form.querySelector("#loanDayCountConvention").value = getLoanDayCountConventionForDisplay(loan);
+    updateDayCountHelp();
+    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = true;
     });
@@ -3397,7 +3246,7 @@ const FormHandler = {
       });
     }
     UIHandler.setLockState(modal, ["loanStartDate", "loanInitialAmount"], true);
-    ["loanName", "loanCurrency"].forEach(id => {
+    ["loanName", "loanCurrency", "loanDayCountConvention"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.closest(".loan-field-wrap")?.classList.add("locked-field-container");
     });
@@ -3562,6 +3411,7 @@ const FormHandler = {
     const firstRate = parseFloat(sortedByDate[0].rate);
     const interestRate = (isNaN(firstRate) ? 0 : Math.max(0, firstRate));
     let loanType = (form.querySelector("#loanType") && form.querySelector("#loanType").value === "lend") ? "lend" : "borrow";
+    const dayCountConvention = LendpileCalculations.normalizeDayCountConvention(form.querySelector("#loanDayCountConvention")?.value, "actual365");
     if (isSharedEdit && UIHandler.currentShare && UIHandler.currentShare.share) {
       const snapshot = UIHandler.currentShare.share.loan_snapshot;
       loanType = snapshot.loanType === "lend" ? "lend" : "borrow";
@@ -3572,6 +3422,7 @@ const FormHandler = {
         startDate,
         initialAmount: parseFloat(form.querySelector("#loanInitialAmount").value || 0),
         interestRate,
+        dayCountConvention,
         currency: form.querySelector("#loanCurrency").value,
         interestChanges: interestChangesCollected,
         loanChanges: FormHandler.collectLoanChanges(),
@@ -3596,6 +3447,7 @@ const FormHandler = {
       startDate,
       initialAmount: parseFloat(form.querySelector("#loanInitialAmount").value || 0),
       interestRate,
+      dayCountConvention,
       currency: form.querySelector("#loanCurrency").value,
       interestChanges: interestChangesCollected,
       loanChanges: FormHandler.collectLoanChanges(),
@@ -3836,16 +3688,7 @@ const ChartHandler = {
       const d = new Date(row.date);
       return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth();
     });
-    let totalInterest = 0, totalAmort = 0;
-    const chartData = timeline.reduce((acc, row) => {
-      acc.labels.push(UIHandler.formatDate(row.paymentDate));
-      acc.debt.push(row.endingDebt);
-      totalInterest += row.interest;
-      acc.interest.push(totalInterest);
-      totalAmort += row.amortization;
-      acc.amort.push(totalAmort);
-      return acc;
-    }, { labels: [], debt: [], interest: [], amort: [] });
+    const chartData = LendpileCalculations.buildChartData(timeline, date => UIHandler.formatDate(date));
     const timelineData = timeline;
     const debtLabel = (loanOptional && loanOptional.loanType === "lend") ? LanguageService.translate("owedToYou") : LanguageService.translate("remainingDebt");
     const tickColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || 'rgba(255,255,255,0.9)';

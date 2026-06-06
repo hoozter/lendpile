@@ -10,6 +10,7 @@ const files = [
   "admin.html",
   "app.html",
   "app.js",
+  "calculations.js",
   "faq.html",
   "index.html",
   "privacy.html",

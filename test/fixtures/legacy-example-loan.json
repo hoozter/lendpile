@@ -1,0 +1,54 @@
+[
+  {
+    "id": "legacy-example-loan",
+    "name": "Legacy example loan",
+    "currency": "SEK",
+    "payments": [
+      {
+        "type": "scheduled",
+        "amount": 500,
+        "status": "active",
+        "endDate": "2024-12-26",
+        "frequency": "1",
+        "startDate": "2023-06-26",
+        "dayOfMonth": "26"
+      },
+      {
+        "type": "scheduled",
+        "amount": 900,
+        "status": "active",
+        "endDate": null,
+        "frequency": "1",
+        "startDate": "2025-01-27",
+        "dayOfMonth": "27"
+      }
+    ],
+    "startDate": "2022-07-04",
+    "loanChanges": [
+      {
+        "date": "2025-01-01",
+        "amount": 50000
+      }
+    ],
+    "interestRate": 0,
+    "initialAmount": 100000,
+    "interestChanges": [
+      {
+        "date": "2023-06-26",
+        "rate": 2
+      },
+      {
+        "date": "2024-08-17",
+        "rate": 3.5
+      },
+      {
+        "date": "2026-01-31",
+        "rate": 2.5
+      },
+      {
+        "date": "2022-07-04",
+        "rate": 0
+      }
+    ]
+  }
+]

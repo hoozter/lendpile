@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test",
+    "compare:calculations": "node scripts/compare-calculations.js",
     "write-config": "node scripts/write-config.js",
     "build:pages": "node scripts/build-pages.js"
   }
