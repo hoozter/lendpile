@@ -1,0 +1,27 @@
+# Local configuration; keep templates tracked.
+config.js
+neonconnect.txt
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated output.
+node_modules/
+worker/node_modules/
+dist/
+.wrangler/
+
+# Generated test data.
+test/lendpile_loans_*.json
+
+# Logs, editor and OS artifacts.
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
