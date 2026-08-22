@@ -497,6 +497,7 @@ const LanguageService = {
       dataImported: 'Data importerad',
       importError: 'Fel vid import',
       settingsSaved: 'Inställningarna har sparats!',
+      changesNotSaved: 'Ändringarna kunde inte sparas.',
       confirmDelete: 'Bekräfta Radering',
       deleteConfirmMessage: 'Är du säker på att du vill ta bort denna post?',
       warning: 'Varning - Känsligt Fält',
@@ -887,6 +888,7 @@ const LanguageService = {
       dataImported: 'Data imported',
       importError: 'Import error',
       settingsSaved: 'Settings Saved',
+      changesNotSaved: 'Changes could not be saved.',
       confirmDelete: 'Confirm Deletion',
       deleteConfirmMessage: 'Are you sure you want to delete this record?',
       warning: 'Warning - Sensitive Field',
@@ -3494,8 +3496,8 @@ const FormHandler = {
         payments: snapshot.payments || []
       };
       const result = await ShareService.updateSharedLoan(UIHandler.currentShare.token, newLoan);
-      if (result.error) {
-        UIHandler.showFeedback(result.error);
+      if (result.error || !result.ok) {
+        UIHandler.showFeedback(result.error || LanguageService.translate("changesNotSaved"));
         return;
       }
       UIHandler.currentShare.share.loan_snapshot = newLoan;

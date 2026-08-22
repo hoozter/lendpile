@@ -10,6 +10,12 @@
  */
 
 import { neon } from "@neondatabase/serverless";
+import {
+  normalizeShareOptions,
+  requireAppliedShareAction,
+  saveOwnerLoanData,
+  updateSharedLoanAtomically,
+} from "./sharing.mjs";
 
 const AUTH_COOKIE_NAME = "__Secure-neon-auth.session_token";
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -346,33 +352,33 @@ export default {
         }
         if (req.method === "PUT") {
           const body = await readJson(req) || {};
-          const rows = await sql`
-            INSERT INTO loan_data (user_id, data, updated_at)
-            VALUES (${user.id}, ${JSON.stringify(body.data ?? [])}::jsonb, NOW())
-            ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-            RETURNING data, updated_at
-          `;
-          return json(rows[0], 200, origin);
+          const loanData = Array.isArray(body.data) ? body.data : [];
+          const saved = await saveOwnerLoanData(sql, user.id, loanData);
+          return json(saved, 200, origin);
         }
       }
 
       if (path === "/shares" && req.method === "POST") {
         const body = await readJson(req) || {};
         const loan = body.loan;
-        const options = body.options || {};
         if (!loan?.id) return json({ error: "Missing loan" }, 400, origin);
+        let options;
+        try {
+          options = normalizeShareOptions(body.options);
+        } catch (error) {
+          return json({ error: error.message }, 400, origin);
+        }
         const token = crypto.randomUUID();
         const profile = await sql`SELECT display_name FROM profiles WHERE user_id = ${user.id}`;
         const ownerName = profile[0]?.display_name || user.name || user.email || "";
-        const days = Math.max(1, parseInt(options.expiresInDays, 10) || 7);
-        const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+        const expiresAt = new Date(Date.now() + options.expiresInDays * 24 * 60 * 60 * 1000);
         const rows = await sql`
           INSERT INTO loan_shares (
             token, owner_id, loan_id, loan_snapshot, permission, recipient_view,
             owner_display_name, owner_email, expires_at
           ) VALUES (
             ${token}, ${user.id}, ${loan.id}, ${JSON.stringify(loan)}::jsonb,
-            ${options.permission || "view"}, ${options.recipientView || "borrowing"},
+            ${options.permission}, ${options.recipientView},
             ${ownerName}, ${user.email}, ${expiresAt}
           )
           RETURNING *
@@ -402,18 +408,8 @@ export default {
       if (updateSharedLoanMatch && req.method === "PUT") {
         const token = decodeURIComponent(updateSharedLoanMatch[1]);
         const body = await readJson(req) || {};
-        const rows = await sql`
-          SELECT * FROM loan_shares
-          WHERE token = ${token} AND permission = 'edit' AND recipient_id = ${user.id}
-            AND used_at IS NOT NULL AND expires_at > NOW()
-        `;
-        const share = rows[0];
-        if (!share) return json({ ok: false }, 200, origin);
-        const ownerDataRows = await sql`SELECT data FROM loan_data WHERE user_id = ${share.owner_id}`;
-        const ownerData = Array.isArray(ownerDataRows[0]?.data) ? ownerDataRows[0].data : [];
-        const nextData = ownerData.map(loan => String(loan?.id) === String(share.loan_id) ? body.loan : loan);
-        await sql`UPDATE loan_data SET data = ${JSON.stringify(nextData)}::jsonb, updated_at = NOW() WHERE user_id = ${share.owner_id}`;
-        await sql`UPDATE loan_shares SET loan_snapshot = ${JSON.stringify(body.loan)}::jsonb WHERE id = ${share.id}`;
+        const updated = await updateSharedLoanAtomically(sql, token, user.id, body.loan);
+        if (!updated) return json({ ok: false, error: "Share is not editable" }, 200, origin);
         return json({ ok: true }, 200, origin);
       }
 
@@ -527,7 +523,12 @@ export default {
             }
           }
         }
-        return json({ ok: rows.length > 0 }, 200, origin);
+        try {
+          requireAppliedShareAction(action, rows);
+        } catch (error) {
+          return json({ error: error.message }, 409, origin);
+        }
+        return json({ ok: true }, 200, origin);
       }
 
       if ((path === "/delete-my-account" && req.method === "POST") || (path === "/users/me" && req.method === "DELETE")) {
