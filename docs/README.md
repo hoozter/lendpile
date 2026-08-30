@@ -61,10 +61,8 @@ The Worker verifies JWTs using Neon JWKS. It does not trust decoded JWT payloads
 
 - Build command: `npm ci && npm run build:pages`
 - Output directory: `dist`
-- Pages environment variables:
-  - `LENDPILE_API_URL`
-  - `NEON_AUTH_URL`
-  - Optional `ADMIN_API_URL`
+- Pages environment variable: `NEON_AUTH_URL`
+- The production API endpoint is source-owned as `https://api.lendpile.com`; stale Pages variables cannot redirect it.
 
 The Pages build copies only public browser files into `dist`, so repo-only files such as `.gitignore`, `neonconnect.txt`, `worker/`, and `neon/` are not published as static assets.
 

@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'dist');
+const productionApiUrl = 'https://api.lendpile.com';
 
 export const publicFiles = [
   'index.html',
@@ -65,7 +66,7 @@ export function stampDeploymentVersion(html, version) {
 
 function requiredEndpoint(value, name) {
   if (!value) {
-    throw new Error('LENDPILE_API_URL and NEON_AUTH_URL are required');
+    throw new Error(`${name} is required`);
   }
   const url = new URL(value);
   if (url.protocol !== 'https:') {
@@ -78,7 +79,7 @@ function requiredEndpoint(value, name) {
 }
 
 export function renderDeploymentConfig(env = process.env) {
-  const apiUrl = requiredEndpoint(env.LENDPILE_API_URL, 'LENDPILE_API_URL');
+  const apiUrl = productionApiUrl;
   const authUrl = requiredEndpoint(env.NEON_AUTH_URL, 'NEON_AUTH_URL');
 
   return `// Generated at build time. Do not edit in dist.\nwindow.LENDPILE_API_URL = ${JSON.stringify(apiUrl)};\nwindow.NEON_AUTH_URL = ${JSON.stringify(authUrl)};\nwindow.ADMIN_API_URL = ${JSON.stringify(apiUrl)};\n`;

@@ -45,11 +45,21 @@ test('stampDeploymentVersion replaces existing asset version parameters', () => 
   );
 });
 
-test('renderDeploymentConfig requires explicit production endpoints', () => {
+test('renderDeploymentConfig requires the authentication endpoint', () => {
   assert.throws(
     () => renderDeploymentConfig({}),
-    /LENDPILE_API_URL and NEON_AUTH_URL are required/
+    /NEON_AUTH_URL is required/
   );
+});
+
+test('renderDeploymentConfig cannot be redirected by a stale Pages API variable', () => {
+  const config = renderDeploymentConfig({
+    LENDPILE_API_URL: 'https://stale.example.test',
+    NEON_AUTH_URL: 'https://auth.example.test/neondb/auth',
+  });
+
+  assert.match(config, /window\.LENDPILE_API_URL = "https:\/\/api\.lendpile\.com";/);
+  assert.doesNotMatch(config, /stale\.example\.test/);
 });
 
 test('renderDeploymentConfig emits the canonical browser config names', () => {
@@ -72,13 +82,6 @@ test('Pages bundle retains routing and support documents', () => {
 });
 
 test('renderDeploymentConfig rejects credentials in public endpoints', () => {
-  assert.throws(
-    () => renderDeploymentConfig({
-      LENDPILE_API_URL: 'https://user:password@api.example.test',
-      NEON_AUTH_URL: 'https://auth.example.test/neondb/auth',
-    }),
-    /must not contain credentials/
-  );
   assert.throws(
     () => renderDeploymentConfig({
       LENDPILE_API_URL: 'https://api.example.test',
