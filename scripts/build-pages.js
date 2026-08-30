@@ -1,52 +1,118 @@
-import fs from "node:fs";
-import path from "node:path";
+import {
+  cpSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(import.meta.dirname, "..");
-const outDir = path.join(root, "dist");
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const outDir = join(root, 'dist');
 
-const files = [
-  "404.html",
-  "_redirects",
-  "admin.html",
-  "app.html",
-  "app.js",
-  "calculations.js",
-  "faq.html",
-  "index.html",
-  "privacy.html",
-  "styles.css",
+export const publicFiles = [
+  'index.html',
+  'app.html',
+  'admin.html',
+  '404.html',
+  '_redirects',
+  'faq.html',
+  'privacy.html',
+  'styles.css',
+  'app.js',
+  'calculations.js',
+  'robots.txt',
+  'sitemap.xml',
 ];
 
-function copyRecursive(src, dest) {
-  const stat = fs.statSync(src);
-  if (stat.isDirectory()) {
-    fs.mkdirSync(dest, { recursive: true });
-    for (const entry of fs.readdirSync(src)) {
-      copyRecursive(path.join(src, entry), path.join(dest, entry));
+const versionedAppAssets = ['config.js', 'calculations.js', 'styles.css', 'app.js'];
+
+export function deploymentVersion(env = process.env, sourceHtml = '') {
+  const commitSha = String(env.CF_PAGES_COMMIT_SHA || '').trim().toLowerCase();
+  if (commitSha) {
+    if (!/^[a-f0-9]{7,64}$/.test(commitSha)) {
+      throw new Error('CF_PAGES_COMMIT_SHA is not a valid commit SHA');
     }
-    return;
+    return commitSha;
   }
-  fs.copyFileSync(src, dest);
+
+  const match = sourceHtml.match(/<meta\s+name="app-version"\s+content="([^"]+)"\s*\/?\s*>/i);
+  const fallback = match ? match[1].trim() : '';
+  if (!fallback || !/^[a-z0-9._-]+$/i.test(fallback)) {
+    throw new Error('app.html must contain a valid app-version fallback');
+  }
+  return fallback;
 }
 
-fs.rmSync(outDir, { recursive: true, force: true });
-fs.mkdirSync(outDir, { recursive: true });
+export function stampDeploymentVersion(html, version) {
+  let stamped = html.replace(
+    /(<meta\s+name="app-version"\s+content=")[^"]*("\s*\/?\s*>)/i,
+    `$1${version}$2`
+  );
 
-for (const file of files) {
-  copyRecursive(path.join(root, file), path.join(outDir, file));
+  for (const asset of versionedAppAssets) {
+    const escapedAsset = asset.replace('.', '\\.');
+    const attribute = asset.endsWith('.css') ? 'href' : 'src';
+    const pattern = new RegExp(`(${attribute}="${escapedAsset})(?:\\?v=[^"]*)?(")`, 'g');
+    stamped = stamped.replace(pattern, `$1?v=${version}$2`);
+  }
+
+  return stamped;
 }
-copyRecursive(path.join(root, "assets"), path.join(outDir, "assets"));
 
-const apiUrl = process.env.LENDPILE_API_URL || process.env.ADMIN_API_URL || "";
-const neonAuthUrl = process.env.NEON_AUTH_URL || "";
-const adminApiUrl = process.env.ADMIN_API_URL || "";
-const extra = adminApiUrl ? `window.ADMIN_API_URL = ${JSON.stringify(adminApiUrl)};\n` : "";
-const config = `/**
- * Generated at build time from environment variables. Do not commit.
- */
-window.LENDPILE_API_URL = ${JSON.stringify(apiUrl)};
-window.NEON_AUTH_URL = ${JSON.stringify(neonAuthUrl)};
-${extra}`;
+function requiredEndpoint(value, name) {
+  if (!value) {
+    throw new Error('LENDPILE_API_URL and NEON_AUTH_URL are required');
+  }
+  const url = new URL(value);
+  if (url.protocol !== 'https:') {
+    throw new Error(`${name} must use https`);
+  }
+  if (url.username || url.password) {
+    throw new Error(`${name} must not contain credentials`);
+  }
+  return url.href.replace(/\/$/, '');
+}
 
-fs.writeFileSync(path.join(outDir, "config.js"), config, "utf8");
-console.log("Built Cloudflare Pages output in dist/");
+export function renderDeploymentConfig(env = process.env) {
+  const apiUrl = requiredEndpoint(env.LENDPILE_API_URL, 'LENDPILE_API_URL');
+  const authUrl = requiredEndpoint(env.NEON_AUTH_URL, 'NEON_AUTH_URL');
+
+  return `// Generated at build time. Do not edit in dist.\nwindow.LENDPILE_API_URL = ${JSON.stringify(apiUrl)};\nwindow.NEON_AUTH_URL = ${JSON.stringify(authUrl)};\nwindow.ADMIN_API_URL = ${JSON.stringify(apiUrl)};\n`;
+}
+
+export function buildPages(env = process.env) {
+  const config = renderDeploymentConfig(env);
+
+  rmSync(outDir, { recursive: true, force: true });
+  mkdirSync(outDir, { recursive: true });
+
+  const sourceAppHtml = readFileSync(join(root, 'app.html'), 'utf8');
+  const version = deploymentVersion(env, sourceAppHtml);
+
+  for (const file of publicFiles) {
+    const source = join(root, file);
+    if (!existsSync(source)) continue;
+    if (file === 'app.html') {
+      writeFileSync(join(outDir, file), stampDeploymentVersion(sourceAppHtml, version));
+    } else {
+      copyFileSync(source, join(outDir, file));
+    }
+  }
+
+  const assetsDir = join(root, 'assets');
+  if (existsSync(assetsDir)) {
+    cpSync(assetsDir, join(outDir, 'assets'), { recursive: true });
+  }
+
+  writeFileSync(join(outDir, 'config.js'), config);
+
+  console.log(`Built public Pages bundle in ${outDir} (version ${version})`);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  buildPages();
+}

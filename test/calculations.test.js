@@ -232,3 +232,248 @@ test("generated loan timelines obey balance invariants", () => {
     assertAdvancedTimelineBalances(C.buildTimelineAdvanced(loan));
   }
 });
+
+test("timeline change markers preserve the entered amount and loan-change context", () => {
+  const change = { date: "2025-01-01", amount: 240000, title: "Car purchase", note: "Family car" };
+  for (const dayCountConvention of ["actual365", "thirty360"]) {
+    const timeline = C.buildTimeline({
+      startDate: "2024-10-01",
+      initialAmount: 450000.1,
+      interestRate: 2,
+      dayCountConvention,
+      interestChanges: [],
+      loanChanges: [change],
+      payments: [{ type: "scheduled", amount: 4000, startDate: "2024-10-27", frequency: 1, frequencyUnit: "month", dayOfMonth: 27 }]
+    });
+    const marker = timeline.flatMap(row => row.changes).find(item => item.type === "loan");
+    assert.deepEqual(
+      { value: marker.value, title: marker.title, note: marker.note },
+      { value: 240000, title: "Car purchase", note: "Family car" }
+    );
+  }
+});
+
+test("timeline interest markers preserve title and note", () => {
+  const timeline = C.buildTimeline({
+    startDate: "2025-01-01",
+    initialAmount: 100000,
+    interestRate: 2,
+    dayCountConvention: "actual365",
+    interestChanges: [{ date: "2025-02-10", rate: 3.5, title: "Rate review", note: "Annual adjustment" }],
+    loanChanges: [],
+    payments: [{ type: "scheduled", amount: 1000, startDate: "2025-01-27", frequency: 1, frequencyUnit: "month", dayOfMonth: 27 }]
+  });
+  const marker = timeline.flatMap(row => row.changes).find(item => item.type === "interest");
+  assert.deepEqual(
+    { value: marker.value, title: marker.title, note: marker.note },
+    { value: 3.5, title: "Rate review", note: "Annual adjustment" }
+  );
+});
+
+test("normalizes legacy drawdowns into canonical loan parts and preserves non-positive changes as adjustments", () => {
+  const normalized = C.normalizeLoan({
+    id: "legacy", startDate: "2025-01-01", initialAmount: 1000, interestRate: 4,
+    interestChanges: [{ date: "2025-03-01", rate: 5 }],
+    loanChanges: [
+      { id: "drawdown-source-id", date: "2025-02-01", amount: 500, title: "Drawdown ref", note: "Audit note", kind: "contract-drawdown", approvedBy: "auditor", audit: { externalRef: "DRAW-7" } },
+      { id: "adjustment-source-id", date: "2025-04-01", amount: -100, title: "Correction", note: "Principal only", kind: "principal-correction", createdAt: "2025-04-02T00:00:00Z", reasonCode: "MANUAL" },
+      { id: "zero-audit-id", date: "2025-05-01", amount: 0, title: "No-op audit", note: "Retained for history", kind: "audit-marker", approvedBy: "reviewer" },
+    ]
+  });
+  assert.equal(normalized.schemaVersion, 2);
+  assert.deepEqual(normalized.loanParts.map(p => [p.originalPrincipal, p.startDate, p.interestRate]), [[1000, "2025-01-01", 4], [500, "2025-02-01", 4]]);
+  assert.deepEqual(
+    { title: normalized.loanParts[1].title, note: normalized.loanParts[1].note, kind: normalized.loanParts[1].kind },
+    { title: "Drawdown ref", note: "Audit note", kind: "contract-drawdown" }
+  );
+  assert.deepEqual(
+    { id: normalized.loanParts[1].id, approvedBy: normalized.loanParts[1].approvedBy, audit: normalized.loanParts[1].audit },
+    { id: "drawdown-source-id", approvedBy: "auditor", audit: { externalRef: "DRAW-7" } }
+  );
+  assert.deepEqual(normalized.principalAdjustments.map(a => [a.amount, a.date]), [[-100, "2025-04-01"], [0, "2025-05-01"]]);
+  assert.deepEqual(
+    { title: normalized.principalAdjustments[0].title, note: normalized.principalAdjustments[0].note, kind: normalized.principalAdjustments[0].kind },
+    { title: "Correction", note: "Principal only", kind: "principal-correction" }
+  );
+  assert.deepEqual(
+    { id: normalized.principalAdjustments[0].id, createdAt: normalized.principalAdjustments[0].createdAt, reasonCode: normalized.principalAdjustments[0].reasonCode },
+    { id: "adjustment-source-id", createdAt: "2025-04-02T00:00:00Z", reasonCode: "MANUAL" }
+  );
+  assert.deepEqual(
+    normalized.principalAdjustments[1],
+    { id: "zero-audit-id", date: "2025-05-01", amount: 0, title: "No-op audit", note: "Retained for history", kind: "audit-marker", approvedBy: "reviewer", allocationPolicy: "proRata" }
+  );
+  assert.ok(!("initialAmount" in normalized));
+  assert.ok(!("loanChanges" in normalized));
+});
+
+test("buildCanonicalLoan preserves facility lifecycle while replacing explicitly edited parts", () => {
+  const existing = C.normalizeLoan({
+    id: "facility", name: "Before", currency: "SEK", dayCountConvention: "actual365",
+    startDate: "2025-01-01", initialAmount: 1000, interestRate: 4,
+    loanChanges: [{ date: "2025-03-01", amount: 500 }],
+    payments: [{ type: "oneTime", date: "2025-04-01", amount: 100 }],
+    predecessorLoanIds: ["old"], refinanceDate: "2025-01-01"
+  });
+  const edited = C.buildCanonicalLoan(existing, {
+    name: "After", currency: "EUR", dayCountConvention: "thirty360", loanType: "borrow",
+    loanParts: existing.loanParts.map(part => ({ ...part })),
+    principalAdjustments: existing.principalAdjustments
+  });
+  assert.equal(edited.schemaVersion, 2);
+  assert.equal(edited.name, "After");
+  assert.equal(edited.currency, "EUR");
+  assert.deepEqual(edited.loanParts, existing.loanParts);
+  assert.deepEqual(edited.payments, existing.payments);
+  assert.deepEqual(edited.predecessorLoanIds, ["old"]);
+  assert.equal(edited.refinanceDate, "2025-01-01");
+  assert.ok(!("initialAmount" in edited));
+  assert.ok(!("loanChanges" in edited));
+});
+
+test("facility editor projection round-trips independent part rates and audit metadata", () => {
+  const existing = C.normalizeLoan({
+    id: "facility", name: "Before", currency: "SEK", dayCountConvention: "actual365",
+    startDate: "2025-01-01", initialAmount: 1000, interestRate: 4,
+    loanChanges: [{ date: "2025-03-01", amount: 500, title: "Second draw", note: "Contract B", kind: "contract-drawdown" }],
+    payments: [{ type: "oneTime", date: "2025-04-01", amount: 100 }]
+  });
+  existing.loanParts[1].interestRate = 7;
+  const editor = C.facilityEditorModel(existing);
+  assert.equal(editor.initialAmount, 1000);
+  assert.deepEqual(editor.loanChanges.map(change => [change.facilityKind, change.kind, change.amount, change.interestRate]), [["part", "contract-drawdown", 500, 7]]);
+  const rebuilt = C.buildCanonicalLoanFromEditor(existing, { ...editor, name: "After" });
+  assert.equal(rebuilt.name, "After");
+  assert.deepEqual(rebuilt.loanParts, existing.loanParts);
+  assert.deepEqual(rebuilt.payments, existing.payments);
+  assert.ok(!("initialAmount" in rebuilt));
+  assert.ok(!("loanChanges" in rebuilt));
+});
+
+test("canonical facilities accrue independently and amortize eligible parts pro-rata with auditable allocations", () => {
+  const loan = {
+    schemaVersion: 2, loanParts: [
+      { id: "a", originalPrincipal: 1000, startDate: "2025-01-01", interestRate: 12 },
+      { id: "b", originalPrincipal: 3000, startDate: "2025-01-01", interestRate: 0 }
+    ],
+    payments: [{ type: "one-time", amount: 1000, startDate: "2025-01-15", allocationPolicy: "proRata" }],
+    dayCountConvention: "actual365"
+  };
+  const row = C.buildTimeline(loan)[0];
+  approx(row.interest, 8.800951773315818, .001);
+  assert.deepEqual(row.paymentAllocations[0].parts.map(p => [p.partId, Math.round(p.principal)]), [["a", 249], ["b", 747]]);
+  approx(row.paymentAllocations[0].parts.reduce((sum, part) => sum + part.interest + part.principal, 0), 1000);
+  assert.equal(row.partBalances.length, 2);
+});
+
+test("refinance closes predecessor facilities from its date and starts successor parts", () => {
+  const predecessor = { id: "old", schemaVersion: 2, loanParts: [{ id: "old-1", originalPrincipal: 1000, startDate: "2025-01-01", interestRate: 0 }], refinanceClosedDate: "2025-02-01" };
+  const successor = { id: "new", schemaVersion: 2, predecessorLoanIds: ["old"], refinanceDate: "2025-02-01", loanParts: [{ id: "new-1", originalPrincipal: 1000, startDate: "2025-02-01", interestRate: 0 }] };
+  assert.equal(C.buildTimeline(predecessor).length, 1);
+  assert.equal(C.buildTimeline(successor)[0].endingDebt, 1000);
+});
+
+test("canonical target payoff and 30/360 retain all unpaid interest in the debt", () => {
+  const base = { schemaVersion: 2, dayCountConvention: "thirty360", loanParts: [{ id: "p", originalPrincipal: 1200, startDate: "2025-01-01", interestRate: 12, compoundInterest: false }], payments: [] };
+  const jan = C.buildTimeline(base)[0];
+  approx(jan.interest, 12);
+  approx(jan.partBalances[0].interest, 12);
+  approx(jan.endingDebt, 1212, .001);
+  approx(C.buildTimeline(base)[1].interest, 12, .001);
+  const required = C.calculatePaymentForTargetDate(base, "2026-01-01");
+  assert.ok(required > 0);
+  assert.ok(C.buildTimeline({ ...base, payments: [{ type: "scheduled", amount: required, startDate: "2025-01-01", endDate: "2026-01-01", frequency: 1, frequencyUnit: "month" }] }).at(-1).endingDebt <= .01);
+});
+
+test("canonical 30/360 uses contractual day counts for mid-month drawdowns", () => {
+  const loan = {
+    schemaVersion: 2,
+    dayCountConvention: "thirty360",
+    loanParts: [{ id: "late", originalPrincipal: 1000, startDate: "2025-07-27", interestRate: 36 }],
+    payments: []
+  };
+  approx(C.buildTimeline(loan)[0].interest, 4, .001);
+});
+
+
+test("non-compounding canonical interest remains a separate liability", () => {
+  const loan = { schemaVersion: 2, dayCountConvention: "thirty360", loanParts: [{ id: "p", originalPrincipal: 1200, startDate: "2025-01-01", interestRate: 12, compoundInterest: false }], payments: [] };
+  const rows = C.buildTimeline(loan);
+  approx(rows[0].partBalances[0].balance, 1200);
+  approx(rows[0].partBalances[0].accruedInterest, 12);
+  approx(rows[0].endingDebt, 1212);
+  approx(rows[1].interest, 12);
+});
+
+test("combining existing loans preserves their independently calculated history and schedules", () => {
+  const sources = [
+    {
+      id: "mortgage-a", name: "Mortgage A", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365",
+      schemaVersion: 2,
+      loanParts: [{ id: "part-1", originalPrincipal: 100000, startDate: "2024-01-01", interestRate: 3, interestChanges: [] }],
+      principalAdjustments: [{ id: "extra-a", date: "2024-06-15", amount: -1000, allocationPolicy: "proRata" }],
+      payments: [{ id: "pay-a", type: "scheduled", amount: 1200, startDate: "2024-02-01", endDate: "2025-12-01", frequency: 1, frequencyUnit: "month", dayOfMonth: "1" }]
+    },
+    {
+      id: "mortgage-b", name: "Mortgage B", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365",
+      schemaVersion: 2,
+      loanParts: [{ id: "part-1", originalPrincipal: 50000, startDate: "2024-03-01", interestRate: 5, interestChanges: [] }],
+      principalAdjustments: [],
+      payments: [{ id: "pay-b", type: "scheduled", amount: 800, startDate: "2024-04-01", endDate: "2025-12-01", frequency: 1, frequencyUnit: "month", dayOfMonth: "1" }]
+    }
+  ];
+
+  const combined = C.combineLoans(sources, { id: "facility-1", name: "My mortgage", combinedAt: "2026-08-30T12:00:00.000Z" });
+  assert.equal(combined.facilityKind, "combined");
+  assert.equal(combined.loanParts.length, 2);
+  assert.equal(new Set(combined.loanParts.map(part => part.id)).size, 2);
+  assert.deepEqual(combined.payments.map(payment => payment.targetPartIds), [
+    ["mortgage-a:part-1"],
+    ["mortgage-b:part-1"]
+  ]);
+  assert.deepEqual(combined.principalAdjustments[0].targetPartIds, ["mortgage-a:part-1"]);
+  assert.deepEqual(combined.combination.sourceLoanIds, ["mortgage-a", "mortgage-b"]);
+
+  const combinedByMonth = new Map(C.buildTimeline(combined).map(row => [row.date.toISOString().slice(0, 7), row.endingDebt]));
+  const sourceRows = sources.map(source => new Map(C.buildTimeline(source).map(row => [row.date.toISOString().slice(0, 7), row.endingDebt])));
+  for (const month of ["2024-03", "2024-06", "2025-01"]) {
+    const expected = sourceRows.reduce((sum, rows) => sum + (rows.get(month) || 0), 0);
+    assert.ok(Math.abs(combinedByMonth.get(month) - expected) < 0.01, `${month} changed by ${combinedByMonth.get(month) - expected}`);
+  }
+});
+
+test("combination eligibility blocks accounting mismatches and reports the user-facing consequences", () => {
+  const base = { loanType: "borrow", currency: "SEK", dayCountConvention: "actual365", loanParts: [{ originalPrincipal: 10, startDate: "2024-01-01", interestRate: 1 }] };
+  assert.match(C.analyzeLoanCombination([base]).errors.join(" "), /at least two/i);
+  assert.match(C.analyzeLoanCombination([base, { ...base, currency: "EUR" }]).errors.join(" "), /currency/i);
+  assert.match(C.analyzeLoanCombination([base, { ...base, loanType: "lend" }]).errors.join(" "), /borrowing.*lending/i);
+  assert.match(C.analyzeLoanCombination([base, { ...base, dayCountConvention: "thirty360" }]).errors.join(" "), /interest calculation/i);
+  for (const marker of ["shared", "isShared", "_shared"]) {
+    assert.match(C.analyzeLoanCombination([base, { ...base, [marker]: true }]).errors.join(" "), /shared/i);
+  }
+  for (const closeField of ["closedDate", "refinanceClosedDate"]) {
+    const closed = { ...base, [closeField]: "2025-01-01" };
+    assert.match(C.analyzeLoanCombination([closed, base]).errors.join(" "), /closed.*cannot be combined/i);
+    assert.match(C.analyzeLoanCombination([base, closed]).errors.join(" "), /closed.*cannot be combined/i);
+  }
+
+  const analysis = C.analyzeLoanCombination([base, base]);
+  assert.equal(analysis.errors.length, 0);
+  assert.equal(analysis.sourceCount, 2);
+  assert.equal(analysis.partCount, 2);
+  assert.ok(analysis.warnings.some(message => /one overview/i.test(message)));
+  assert.ok(analysis.warnings.some(message => /original rate/i.test(message)));
+  assert.ok(analysis.warnings.some(message => /payment schedules/i.test(message)));
+});
+
+test("a combined facility can restore exact canonical source records", () => {
+  const sources = [
+    { id: "a", name: "A", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365", initialAmount: 100, startDate: "2024-01-01", interestRate: 1, payments: [] },
+    { id: "b", name: "B", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365", initialAmount: 200, startDate: "2024-02-01", interestRate: 2, payments: [] }
+  ];
+  const combined = C.combineLoans(sources, { id: "combined", name: "A + B", combinedAt: "2026-08-30T12:00:00.000Z" });
+  const restored = C.uncombineLoan(combined);
+  assert.deepEqual(restored, sources.map(C.normalizeLoan));
+  restored[0].name = "changed";
+  assert.equal(combined.combination.sources[0].name, "A");
+});

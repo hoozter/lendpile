@@ -28,6 +28,8 @@ Use the app: add a loan, set amortization, open it to see the table and chart. C
 
 Setup, deployment (e.g. Cloudflare Pages + Worker), admin, database schema, and reference: **[docs/README.md](docs/README.md)**.
 
+Frontend deployments built with `npm run build:pages` are automatically versioned. Already-open clients are offered a user-confirmed update on the next check (after 15 seconds, then every 60 seconds); see **Frontend update notifications** in the full documentation.
+
 ## License
 
 [CC BY-NC 4.0](LICENSE) — free for non-commercial use. By [hoozter](https://hoozter.com).

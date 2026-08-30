@@ -68,6 +68,14 @@ The Worker verifies JWTs using Neon JWKS. It does not trust decoded JWT payloads
 
 The Pages build copies only public browser files into `dist`, so repo-only files such as `.gitignore`, `neonconnect.txt`, `worker/`, and `neon/` are not published as static assets.
 
+### Frontend update notifications
+
+An open `app.html` tab checks its own document after 15 seconds and then every 60 seconds with `cache: "no-store"`. When the deployed `app-version` differs, Lendpile shows a user-confirmed Update dialog; it never reloads the page silently.
+
+`npm run build:pages` automatically stamps `dist/app.html` with Cloudflare Pages' `CF_PAGES_COMMIT_SHA` and applies that value to local CSS/JavaScript URLs as a cache-busting query parameter. This means every Git-backed Pages deployment has a distinct version and the refreshed page receives matching assets. Local builds fall back to the `app-version` value in source `app.html`.
+
+**Release contract:** production must publish the generated `dist` directory using the documented build command. Do not publish the source directory directly or remove the version check, version meta tag, or build stamping. If the hosting/build path changes, preserve this behavior and verify it with `node --test test/build-pages.test.js`.
+
 ## Preserving Existing Lendpile Users
 
 Lendpile has existing users that must be preserved. Existing app data has already been imported into Neon under legacy user IDs and will be claimed by email on first login.

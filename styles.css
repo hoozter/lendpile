@@ -213,7 +213,8 @@ input:focus, select:focus { outline: none; border-color: var(--primary-color); }
   border: 1px solid var(--input-border);
   border-radius: 6px;
 }
-.change-item-details { display: flex; gap: 20px; color: var(--text-color); }
+.change-item-details { display: flex; flex-wrap: wrap; gap: 6px 20px; color: var(--text-color); }
+.change-item-title { flex-basis: 100%; }
 .change-item-actions { display: flex; gap: 10px; }
 
 /* =============================
@@ -236,10 +237,17 @@ input:focus, select:focus { outline: none; border-color: var(--primary-color); }
   color: #fff;
   padding: 8px 12px;
   border-radius: 4px;
-  white-space: nowrap;
+  white-space: normal;
+  width: max-content;
+  max-width: min(340px, 80vw);
   font-size: 14px;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
+.tooltip-title { font-weight: 700; }
+.tooltip-note { opacity: 0.82; }
 .tooltip-container:hover .tooltip-text { visibility: visible; }
 .tooltip-container .tooltip-text::after {
   content: "";
@@ -766,6 +774,42 @@ th, td {
   margin-bottom: 16px;
 }
 .loan-info-header h2 { margin: 0; }
+.loan-info-actions { display: flex; align-items: center; gap: 8px; }
+.loan-info-actions button { margin: 0; }
+
+.combine-loans-modal-content { max-width: 680px; }
+.combine-intro { margin: 0 0 18px; color: var(--placeholder-color); }
+.combine-loan-fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+.combine-loan-fieldset legend { font-weight: 500; margin-bottom: 8px; }
+.combine-loan-options { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; }
+.combine-loan-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-background);
+  cursor: pointer;
+}
+.combine-loan-option:has(input:checked) { border-color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
+.combine-loan-option input { width: 18px; height: 18px; margin: 0; }
+.combine-loan-option-main { min-width: 0; }
+.combine-loan-option-name { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.combine-loan-option-meta { display: block; color: var(--placeholder-color); font-size: 12px; }
+.combine-loan-option-amount { font-weight: 500; white-space: nowrap; }
+.combine-name-wrap label { display: block; margin-bottom: 6px; font-weight: 500; }
+.combine-feedback { min-height: 1.5em; color: var(--button-delete); }
+.combine-review { margin-top: 8px; padding: 16px; border-radius: 8px; background: color-mix(in srgb, var(--primary-color) 8%, var(--section-background)); }
+.combine-review h3 { margin-top: 0; }
+.combine-summary { font-weight: 500; margin-bottom: 10px; }
+.combine-warnings { padding-left: 20px; margin: 0 0 14px; }
+.combine-warnings li { margin-bottom: 6px; }
+.combine-confirm-row { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; cursor: pointer; }
+.combine-confirm-row input { width: 18px; height: 18px; margin: 3px 0 0; flex: 0 0 auto; }
+.combined-source-list { margin: 8px 0 0; padding-left: 20px; }
+.combined-source-list li { margin-bottom: 4px; }
 .loan-card-compact {
   display: flex;
   align-items: center;

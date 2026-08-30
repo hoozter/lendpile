@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Bump when you deploy so users see "New version available". When you say "update version", bump this too (e.g. match project version or increment). -->
-  <meta name="app-version" content="0.2.1" />
+  <!-- Local fallback only. Cloudflare Pages replaces this with CF_PAGES_COMMIT_SHA during the required build. -->
+  <meta name="app-version" content="0.2.2" />
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
   <meta name="color-scheme" content="light dark">
   <script>
@@ -85,7 +85,10 @@
         </div>
         <div class="loan-info-header">
           <h2 data-translate="myLoans">Mina lån</h2>
-          <button class="btn-add" id="add-loan-btn" data-translate="addLoan">Lägg till Lån</button>
+          <div class="loan-info-actions">
+            <button type="button" class="btn-secondary hidden" id="combine-loans-btn" data-translate="combineLoans">Kombinera lån</button>
+            <button class="btn-add" id="add-loan-btn" data-translate="addLoan">Lägg till Lån</button>
+          </div>
         </div>
         <div id="loans-list">
           <p data-translate="noLoans">Inga lån registrerade. Lägg till ett nytt lån ovan.</p>
@@ -201,10 +204,10 @@
           <button type="button" id="add-interest-change-btn" class="btn-add" data-change-type="interest" data-translate="addInterestChange">Lägg till ränteförändring</button>
         </div>
         <div class="modal-section">
-          <h4 class="modal-section-title" data-translate="loanChanges">Låneförändringar</h4>
+          <h4 class="modal-section-title">Loan parts and principal adjustments</h4>
           <p class="form-section-help hidden" id="loan-changes-section-help"></p>
           <div id="loan-changes-list"></div>
-          <button type="button" id="add-loan-change-btn" class="btn-add" data-change-type="loan" data-translate="addLoanChange">Lägg till låneförändring</button>
+          <button type="button" id="add-loan-change-btn" class="btn-add" data-change-type="loan">Add loan part or principal adjustment</button>
         </div>
         <div class="modal-actions">
           <button type="submit" class="btn-primary" data-translate="save">Spara Lån</button>
@@ -355,6 +358,14 @@
           <div class="form-row">
             <label for="changeValue" id="changeValueLabel"></label>
             <input type="number" id="changeValue" step="0.01" required />
+          </div>
+          <div class="form-row">
+            <label for="changeTitle" data-translate="changeTitle">Title</label>
+            <input type="text" id="changeTitle" maxlength="120" />
+          </div>
+          <div class="form-row">
+            <label for="changeNote" data-translate="changeNote">Note</label>
+            <textarea id="changeNote" rows="3" maxlength="2000"></textarea>
           </div>
         </div>
         <div class="modal-actions">
@@ -674,6 +685,39 @@
         </div>
         <p id="share-link-feedback" class="account-field-help hidden"></p>
       </div>
+    </div>
+  </div>
+
+  <!-- COMBINE LOANS MODAL -->
+  <div id="combine-loans-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="combine-loans-title">
+    <div class="modal-content combine-loans-modal-content">
+      <span class="btn-close" aria-label="Close">&times;</span>
+      <h2 id="combine-loans-title" data-translate="combineLoans">Combine loans</h2>
+      <p class="combine-intro" data-translate="combineLoansIntro">Choose loans that belong together. They will become one overview while each loan part keeps its own rate and history.</p>
+      <form id="combine-loans-form">
+        <fieldset class="combine-loan-fieldset">
+          <legend data-translate="chooseLoans">Choose loans</legend>
+          <div id="combine-loan-options" class="combine-loan-options"></div>
+        </fieldset>
+        <div class="combine-name-wrap hidden" id="combine-name-wrap">
+          <label for="combine-loan-name" data-translate="combinedLoanName">Name for the combined loan</label>
+          <input type="text" id="combine-loan-name" maxlength="200" autocomplete="off">
+        </div>
+        <div id="combine-loans-feedback" class="combine-feedback" role="status" aria-live="polite"></div>
+        <section id="combine-loans-review" class="combine-review hidden" aria-live="polite">
+          <h3 data-translate="beforeCombining">Before combining</h3>
+          <div id="combine-loans-summary" class="combine-summary"></div>
+          <ul id="combine-loans-warnings" class="combine-warnings"></ul>
+          <label class="combine-confirm-row">
+            <input type="checkbox" id="combine-loans-confirm">
+            <span data-translate="combineLoansConfirm">I understand that this creates one overview, not a new loan agreement or refinance.</span>
+          </label>
+        </section>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-combine-loans-btn" data-translate="cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="confirm-combine-loans-btn" disabled data-translate="combineSelectedLoans">Combine selected loans</button>
+        </div>
+      </form>
     </div>
   </div>
   

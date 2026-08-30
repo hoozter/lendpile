@@ -43,6 +43,17 @@
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / DAY_MS));
   }
 
+  function days360US(start, end) {
+    let startDay = start.getDate();
+    let endDay = end.getDate();
+    const startIsLastFebruaryDay = start.getMonth() === 1 && startDay === new Date(start.getFullYear(), 2, 0).getDate();
+    const endIsLastFebruaryDay = end.getMonth() === 1 && endDay === new Date(end.getFullYear(), 2, 0).getDate();
+    if (startDay === 31 || startIsLastFebruaryDay) startDay = 30;
+    if ((endDay === 31 && startDay === 30) || (endIsLastFebruaryDay && startIsLastFebruaryDay)) endDay = 30;
+    return Math.max(0, (end.getFullYear() - start.getFullYear()) * 360
+      + (end.getMonth() - start.getMonth()) * 30 + endDay - startDay);
+  }
+
   function numeric(value, fallback = 0) {
     const n = typeof value === "number" ? value : parseFloat(value);
     return Number.isFinite(n) ? n : fallback;
@@ -167,7 +178,7 @@
     return rate;
   }
 
-  function buildTimelineAdvanced(loan, options = {}) {
+  function buildTimelineAdvancedLegacy(loan, options = {}) {
     const loanStart = parseDate(loan && loan.startDate);
     if (!loanStart) return [];
     const timeline = [];
@@ -191,13 +202,25 @@
       for (const change of (loan.interestChanges || [])) {
         const date = parseDate(change.date);
         if (date && date >= periodStart && date < periodEnd) {
-          events.push({ type: "interest", date, value: Math.max(0, numeric(change.rate)) });
+          events.push({
+            type: "interest",
+            date,
+            value: Math.max(0, numeric(change.rate)),
+            title: String(change.title || ""),
+            note: String(change.note || "")
+          });
         }
       }
       for (const change of (loan.loanChanges || [])) {
         const date = parseDate(change.date);
         if (date && date >= periodStart && date < periodEnd) {
-          events.push({ type: "loan", date, value: numeric(change.amount) });
+          events.push({
+            type: "loan",
+            date,
+            value: numeric(change.amount),
+            title: String(change.title || ""),
+            note: String(change.note || "")
+          });
         }
       }
       for (const p of (loan.payments || [])) {
@@ -229,12 +252,25 @@
       for (const event of events) {
         applyInterestTo(event.date);
         if (event.type === "interest") {
-          if (event.value !== currentRate) changesThisMonth.push({ type: "interest", value: event.value, date: new Date(event.date) });
+          if (event.value !== currentRate) changesThisMonth.push({
+            type: "interest",
+            value: event.value,
+            date: new Date(event.date),
+            title: event.title,
+            note: event.note
+          });
           currentRate = event.value;
         } else if (event.type === "loan") {
-          const previousDebt = currentDebt;
+          const appliedValue = event.value < -currentDebt ? -currentDebt : event.value;
           currentDebt = Math.max(0, currentDebt + event.value);
-          changesThisMonth.push({ type: "loan", value: currentDebt - previousDebt, date: new Date(event.date) });
+          changesThisMonth.push({
+            type: "loan",
+            value: appliedValue,
+            enteredValue: event.value,
+            date: new Date(event.date),
+            title: event.title,
+            note: event.note
+          });
         } else if (event.type === "payment") {
           const amount = Math.max(0, event.value);
           const interestCovered = Math.min(amount, accruedInterest);
@@ -299,7 +335,7 @@
         ...loan,
         payments: [{ type: "scheduled", amount: p, startDate: loan.startDate, endDate: targetDateStr, frequency: 1, frequencyUnit: "month", dayOfMonth }]
       };
-      const timeline = buildTimelineAdvanced(loanCopy, options);
+      const timeline = buildTimelineAdvancedLegacy(loanCopy, options);
       if (!timeline.length) {
         low = p;
         continue;
@@ -359,13 +395,13 @@
     return { total: Object.values(breakdown).reduce((sum, v) => sum + v, 0), breakdown };
   }
 
-  function buildTimeline(loan, options = {}) {
+  function buildTimelineLegacy(loan, options = {}) {
     const convention = normalizeDayCountConvention(options.dayCountConvention || loan?.dayCountConvention);
     if (convention === DAY_COUNT_CONVENTIONS.ACTUAL_365) {
-      return buildTimelineAdvanced(loan, { ...options, denominator: 365 });
+      return buildTimelineAdvancedLegacy(loan, { ...options, denominator: 365 });
     }
     if (convention === DAY_COUNT_CONVENTIONS.ACTUAL_360) {
-      return buildTimelineAdvanced(loan, { ...options, denominator: 360 });
+      return buildTimelineAdvancedLegacy(loan, { ...options, denominator: 360 });
     }
     if (!loan || !loan.startDate) return [];
     const timeline = [];
@@ -392,10 +428,17 @@
     while (monthsCount < MAX_MONTHS && currentDebt > 0) {
       const changesThisMonth = [];
       if (pendingInterestChange !== null) {
+        const pending = pendingInterestChange;
         const prevRate = currentRate;
-        currentRate = pendingInterestChange;
+        currentRate = pending.value;
         pendingInterestChange = null;
-        if (prevRate !== currentRate) changesThisMonth.push({ type: "interest", value: currentRate });
+        if (prevRate !== currentRate) changesThisMonth.push({
+          type: "interest",
+          value: currentRate,
+          date: pending.date,
+          title: pending.title,
+          note: pending.note
+        });
       }
 
       if (icIndex < interestChanges.length) {
@@ -403,7 +446,12 @@
         if (sameMonth(icDate, currentDate)) {
           const newRate = Math.max(0, numeric(interestChanges[icIndex].rate));
           if (newRate === currentRate) currentRate = newRate;
-          else pendingInterestChange = newRate;
+          else pendingInterestChange = {
+            value: newRate,
+            date: icDate,
+            title: String(interestChanges[icIndex].title || ""),
+            note: String(interestChanges[icIndex].note || "")
+          };
           icIndex++;
         }
       }
@@ -413,9 +461,16 @@
         if (lcDate && (lcDate.getFullYear() < currentDate.getFullYear() ||
             (lcDate.getFullYear() === currentDate.getFullYear() && lcDate.getMonth() <= currentDate.getMonth()))) {
           const amount = numeric(loanChanges[lcIndex].amount);
-          const previousDebt = currentDebt;
+          const appliedValue = amount < -currentDebt ? -currentDebt : amount;
           currentDebt = Math.max(0, currentDebt + amount);
-          changesThisMonth.push({ type: "loan", value: currentDebt - previousDebt });
+          changesThisMonth.push({
+            type: "loan",
+            value: appliedValue,
+            enteredValue: amount,
+            date: lcDate,
+            title: String(loanChanges[lcIndex].title || ""),
+            note: String(loanChanges[lcIndex].note || "")
+          });
           lcIndex++;
         } else {
           break;
@@ -487,7 +542,331 @@
     return timeline;
   }
 
+  // Version 2 is the sole saved facility shape. This normalizer is deliberately
+  // one-way: legacy fields are read only at import/load time and never emitted.
+  function isoDate(value) { const d = parseDate(value); return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` : ""; }
+  function normalizeLoan(input) {
+    const loan = input || {};
+    if (Array.isArray(loan.loanParts)) {
+      const { initialAmount, interestRate, startDate, loanChanges, interestChanges, ...canonical } = loan;
+      return { ...canonical, schemaVersion: 2, loanParts: loan.loanParts.map((part, i) => ({
+        ...part,
+        id: part.id || `part-${i + 1}`, originalPrincipal: Math.max(0, numeric(part.originalPrincipal ?? part.amount)),
+        startDate: isoDate(part.startDate), interestRate: Math.max(0, numeric(part.interestRate)),
+        compoundInterest: Boolean(part.compoundInterest), interestChanges: Array.isArray(part.interestChanges) ? part.interestChanges : []
+      })), principalAdjustments: Array.isArray(loan.principalAdjustments) ? loan.principalAdjustments : [] };
+    }
+    const start = isoDate(loan.startDate);
+    const baseChanges = (loan.interestChanges || []).slice().sort((a,b) => parseDate(a.date) - parseDate(b.date));
+    const rateAt = date => { let rate = numeric(loan.interestRate); for (const c of baseChanges) if (parseDate(c.date) <= parseDate(date)) rate = numeric(c.rate); return Math.max(0, rate); };
+    const parts = [{ id: "part-1", originalPrincipal: Math.max(0, numeric(loan.initialAmount)), startDate: start, interestRate: rateAt(start), compoundInterest: Boolean(loan.compoundInterest), interestChanges: baseChanges }];
+    const adjustments = [];
+    (loan.loanChanges || []).forEach((change, i) => {
+      const amount = numeric(change.amount), date = isoDate(change.date);
+      const { amount: _legacyAmount, date: _legacyDate, ...auditFields } = change;
+      if (amount > 0) parts.push({
+        ...auditFields,
+        id: change.id || `part-drawdown-${i + 1}`,
+        originalPrincipal: amount,
+        startDate: date,
+        interestRate: rateAt(date),
+        compoundInterest: Boolean(loan.compoundInterest),
+        interestChanges: baseChanges.filter(c => parseDate(c.date) >= parseDate(date))
+      });
+      else adjustments.push({
+        ...auditFields,
+        id: change.id || `adjustment-${i + 1}`,
+        date,
+        amount,
+        allocationPolicy: "proRata"
+      });
+    });
+    const { initialAmount, interestRate, startDate, loanChanges, interestChanges, ...rest } = loan;
+    return { ...rest, schemaVersion: 2, loanParts: parts, principalAdjustments: adjustments };
+  }
+
+  function buildCanonicalLoan(existing, draft) {
+    const base = normalizeLoan(existing || {});
+    const {
+      initialAmount, interestRate, startDate, loanChanges, interestChanges,
+      ...canonicalDraft
+    } = draft || {};
+    const parts = Array.isArray(canonicalDraft.loanParts)
+      ? canonicalDraft.loanParts
+      : base.loanParts;
+    const adjustments = Array.isArray(canonicalDraft.principalAdjustments)
+      ? canonicalDraft.principalAdjustments
+      : base.principalAdjustments;
+    return normalizeLoan({
+      ...base,
+      ...canonicalDraft,
+      schemaVersion: 2,
+      loanParts: parts,
+      principalAdjustments: adjustments,
+      payments: canonicalDraft.payments ?? base.payments ?? []
+    });
+  }
+
+  function facilityEditorModel(input) {
+    const canonical = normalizeLoan(input || {});
+    const [primary = {}, ...additionalParts] = canonical.loanParts || [];
+    return {
+      ...canonical,
+      startDate: primary.startDate || "",
+      initialAmount: numeric(primary.originalPrincipal),
+      interestRate: numeric(primary.interestRate),
+      compoundInterest: Boolean(primary.compoundInterest),
+      interestChanges: Array.isArray(primary.interestChanges) ? primary.interestChanges.map(change => ({ ...change })) : [],
+      loanChanges: [
+        ...additionalParts.map(part => ({ ...part, facilityKind: "part", date: part.startDate, amount: numeric(part.originalPrincipal) })),
+        ...(canonical.principalAdjustments || []).map(adjustment => ({ ...adjustment, facilityKind: "adjustment" }))
+      ]
+    };
+  }
+
+  function buildCanonicalLoanFromEditor(existing, editor) {
+    const base = normalizeLoan(existing || {});
+    const draft = editor || {};
+    const primaryBase = (base.loanParts && base.loanParts[0]) || {};
+    const primary = {
+      ...primaryBase,
+      id: primaryBase.id || "part-1",
+      originalPrincipal: Math.max(0, numeric(draft.initialAmount)),
+      startDate: isoDate(draft.startDate),
+      interestRate: Math.max(0, numeric(draft.interestRate)),
+      compoundInterest: Boolean(draft.compoundInterest ?? primaryBase.compoundInterest),
+      interestChanges: Array.isArray(draft.interestChanges) ? draft.interestChanges.map(change => ({ ...change })) : []
+    };
+    const parts = [primary];
+    const adjustments = [];
+    for (const change of (draft.loanChanges || [])) {
+      const amount = numeric(change.amount);
+      const date = isoDate(change.date);
+      const facilityKind = change.facilityKind || (change.kind === "part" || change.kind === "adjustment" ? change.kind : "");
+      if (facilityKind === "part" || amount > 0) {
+        const { facilityKind: _facilityKind, amount: _amount, date: _date, allocationPolicy, ...partFields } = change;
+        const inheritedChange = (primary.interestChanges || [])
+          .filter(item => parseDate(item.date) <= parseDate(date))
+          .sort((a, b) => parseDate(b.date) - parseDate(a.date))[0];
+        const inheritedRate = inheritedChange ? numeric(inheritedChange.rate) : numeric(primary.interestRate);
+        parts.push({
+          ...partFields,
+          id: change.id || `part-${parts.length + 1}`,
+          originalPrincipal: Math.max(0, amount),
+          startDate: date,
+          interestRate: Number.isFinite(Number(change.interestRate)) ? Math.max(0, numeric(change.interestRate)) : inheritedRate,
+          compoundInterest: Boolean(change.compoundInterest ?? primary.compoundInterest),
+          interestChanges: Array.isArray(change.interestChanges)
+            ? change.interestChanges.map(item => ({ ...item }))
+            : (primary.interestChanges || []).filter(item => parseDate(item.date) >= parseDate(date)).map(item => ({ ...item }))
+        });
+      } else if (facilityKind === "adjustment" || amount < 0) {
+        const { facilityKind: _facilityKind, ...adjustment } = change;
+        adjustments.push({ ...adjustment, id: change.id || `adjustment-${adjustments.length + 1}`, date, amount, allocationPolicy: change.allocationPolicy || "proRata" });
+      }
+    }
+    return buildCanonicalLoan(base, { ...draft, loanParts: parts, principalAdjustments: adjustments });
+  }
+
+  function cloneData(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
+  function analyzeLoanCombination(inputs) {
+    const sourceLoans = Array.isArray(inputs) ? inputs.filter(Boolean) : [];
+    const loans = sourceLoans.map(normalizeLoan);
+    const errors = [];
+    const currencies = new Set(loans.map(loan => loan.currency || "SEK"));
+    const loanTypes = new Set(loans.map(loan => loan.loanType || "borrow"));
+    const conventions = new Set(loans.map(loan => normalizeDayCountConvention(loan.dayCountConvention)));
+    if (loans.length < 2) errors.push("Select at least two loans to combine.");
+    if (currencies.size > 1) errors.push("Loans must use the same currency.");
+    if (loanTypes.size > 1) errors.push("Loans must all be borrowing or all be lending.");
+    if (conventions.size > 1) errors.push("Loans must use the same interest calculation method.");
+    if (sourceLoans.some(loan => loan.shared || loan.isShared || loan._shared)) errors.push("Shared loans cannot be combined yet.");
+    if (loans.some(loan => loan.closedDate || loan.refinanceClosedDate)) errors.push("Closed or refinanced loans cannot be combined yet.");
+    if (loans.some(loan => loan.facilityKind === "combined")) errors.push("A combined facility cannot be combined again. Separate it first.");
+    return {
+      errors,
+      warnings: [
+        "The selected loans will appear as one overview and forecast instead of separate cards.",
+        "Every loan part keeps its original rate, start date, changes, and calculation history; rates are never averaged for accounting.",
+        "Existing payment schedules and principal adjustments stay attached to their original loan parts.",
+        "You can separate the facility later, but edits made after combining are discarded when the original records are restored."
+      ],
+      sourceCount: loans.length,
+      partCount: loans.reduce((sum, loan) => sum + (loan.loanParts || []).length, 0),
+      originalPrincipal: loans.reduce((sum, loan) => sum + (loan.loanParts || []).reduce((partSum, part) => partSum + numeric(part.originalPrincipal), 0), 0),
+      paymentPlanCount: loans.reduce((sum, loan) => sum + (loan.payments || []).length, 0),
+      currency: loans[0]?.currency || "SEK",
+      loanType: loans[0]?.loanType || "borrow",
+      dayCountConvention: loans[0]?.dayCountConvention || "actual365"
+    };
+  }
+
+  function combineLoans(inputs, options = {}) {
+    const sourceLoans = (Array.isArray(inputs) ? inputs : []).map(normalizeLoan);
+    const analysis = analyzeLoanCombination(sourceLoans);
+    if (analysis.errors.length) throw new Error(analysis.errors.join(" "));
+    const first = sourceLoans[0];
+    const {
+      id: _sourceId, name: _sourceName, loanParts: _sourceParts,
+      principalAdjustments: _sourceAdjustments, payments: _sourcePayments,
+      combination: _sourceCombination, facilityKind: _sourceFacilityKind,
+      ...sharedFields
+    } = first;
+    const parts = [];
+    const adjustments = [];
+    const payments = [];
+    const sourceLoanIds = [];
+    sourceLoans.forEach((loan, loanIndex) => {
+      const sourceKey = String(loan.id ?? `source-${loanIndex + 1}`);
+      sourceLoanIds.push(loan.id ?? sourceKey);
+      const partIds = (loan.loanParts || []).map((part, partIndex) => {
+        const sourcePartId = String(part.id ?? `part-${partIndex + 1}`);
+        const id = `${sourceKey}:${sourcePartId}`;
+        parts.push({ ...cloneData(part), id, sourceLoanId: loan.id ?? sourceKey, sourceLoanName: loan.name || `Loan ${loanIndex + 1}`, sourcePartId });
+        return id;
+      });
+      const originalToCombinedPartIds = new Map((loan.loanParts || []).map((part, partIndex) => [
+        String(part.id ?? `part-${partIndex + 1}`), partIds[partIndex]
+      ]));
+      const mappedTargets = targetPartIds => {
+        if (!Array.isArray(targetPartIds) || !targetPartIds.length) return [...partIds];
+        const mapped = targetPartIds.map(id => originalToCombinedPartIds.get(String(id))).filter(Boolean);
+        return mapped.length ? mapped : [...partIds];
+      };
+      (loan.principalAdjustments || []).forEach((adjustment, adjustmentIndex) => adjustments.push({
+        ...cloneData(adjustment),
+        id: `${sourceKey}:${adjustment.id ?? `adjustment-${adjustmentIndex + 1}`}`,
+        sourceLoanId: loan.id ?? sourceKey,
+        targetPartIds: mappedTargets(adjustment.targetPartIds),
+        allocationPolicy: adjustment.allocationPolicy || "proRata"
+      }));
+      (loan.payments || []).forEach((payment, paymentIndex) => payments.push({
+        ...cloneData(payment),
+        id: `${sourceKey}:${payment.id ?? `payment-${paymentIndex + 1}`}`,
+        sourceLoanId: loan.id ?? sourceKey,
+        targetPartIds: mappedTargets(payment.targetPartIds),
+        allocationPolicy: payment.allocationPolicy || "proRata"
+      }));
+    });
+    return normalizeLoan({
+      ...sharedFields,
+      id: options.id || `combined-${Date.now()}`,
+      name: String(options.name || sourceLoans.map(loan => loan.name).filter(Boolean).join(" + ") || "Combined loans").trim(),
+      facilityKind: "combined",
+      schemaVersion: 2,
+      currency: analysis.currency,
+      loanType: analysis.loanType,
+      dayCountConvention: analysis.dayCountConvention,
+      loanParts: parts,
+      principalAdjustments: adjustments,
+      payments,
+      combination: {
+        version: 1,
+        combinedAt: options.combinedAt || new Date().toISOString(),
+        sourceLoanIds,
+        sources: cloneData(sourceLoans)
+      }
+    });
+  }
+
+  function uncombineLoan(input) {
+    const sources = input?.combination?.sources;
+    if (!Array.isArray(sources) || sources.length < 2) throw new Error("This facility does not contain restorable source loans.");
+    return cloneData(sources).map(normalizeLoan);
+  }
+
+  function isCanonicalLoan(loan) { return Array.isArray(loan && loan.loanParts); }
+  function canonicalStart(loan) { return loan.loanParts.map(p => parseDate(p.startDate)).filter(Boolean).sort((a,b)=>a-b)[0] || null; }
+  function partRate(part, date) { let rate = numeric(part.interestRate); for (const c of (part.interestChanges || []).slice().sort((a,b)=>parseDate(a.date)-parseDate(b.date))) if (parseDate(c.date) <= date) rate = Math.max(0, numeric(c.rate)); return rate; }
+  function eligibleStates(states, targetPartIds) {
+    if (!Array.isArray(targetPartIds) || !targetPartIds.length) return states;
+    const targetIds = new Set(targetPartIds.map(String));
+    return states.filter(state => targetIds.has(String(state.part.id)));
+  }
+  function allocateProRata(states, amount, targetPartIds) {
+    const eligible = eligibleStates(states, targetPartIds).filter(s => s.balance > .000001), total = eligible.reduce((n,s)=>n+s.balance,0);
+    let remaining = Math.min(Math.max(0, amount), total);
+    return eligible.map((s, i) => { const value = i === eligible.length - 1 ? remaining : Math.min(s.balance, amount * s.balance / total); remaining -= value; s.balance -= value; return { partId: s.part.id, interest: 0, principal: value }; });
+  }
+  function allocateAccruedInterest(states, amount, targetPartIds) {
+    const eligible = eligibleStates(states, targetPartIds).filter(s => s.accrued > .000001), total = eligible.reduce((sum, state) => sum + state.accrued, 0);
+    let remaining = Math.min(Math.max(0, amount), total);
+    return eligible.map((state, index) => {
+      const value = index === eligible.length - 1 ? remaining : Math.min(state.accrued, amount * state.accrued / total);
+      remaining -= value;
+      state.accrued -= value;
+      return { partId: state.part.id, interest: value, principal: 0 };
+    });
+  }
+  function mergePartAllocations(interestParts, principalParts) {
+    const merged = new Map();
+    for (const part of [...interestParts, ...principalParts]) {
+      const allocation = merged.get(part.partId) || { partId: part.partId, interest: 0, principal: 0 };
+      allocation.interest += part.interest || 0;
+      allocation.principal += part.principal || 0;
+      merged.set(part.partId, allocation);
+    }
+    return [...merged.values()];
+  }
+  function buildCanonicalTimeline(loan, options = {}) {
+    const start = canonicalStart(loan); if (!start) return [];
+    const selectedConvention = options.dayCountConvention || loan.dayCountConvention;
+    const convention = normalizeDayCountConvention(selectedConvention);
+    const thirty360 = selectedConvention === "thirty360" || selectedConvention === "30/360" || convention === DAY_COUNT_CONVENTIONS.THIRTY_360;
+    const denominator = convention === DAY_COUNT_CONVENTIONS.ACTUAL_360 ? 360 : (thirty360 ? 360 : 365);
+    const close = parseDate(loan.refinanceClosedDate || loan.closedDate);
+    const states = loan.loanParts.map(part => ({ part, balance: 0, active: false, accrued: 0, monthInterest: 0 }));
+    const timeline = []; let month = monthStart(start);
+    for (let n=0; n < MAX_MONTHS; n++) {
+      const end = nextMonthStart(month); if (close && month >= close) break;
+      const periodEnd = close && close < end ? close : end, events=[];
+      states.forEach(s => { const d=parseDate(s.part.startDate); if (d && d >= month && d < periodEnd) events.push({type:"draw",date:d,state:s}); (s.part.interestChanges||[]).forEach(c=>{const d=parseDate(c.date);if(d&&d>=month&&d<periodEnd) events.push({type:"rate",date:d}); }); });
+      (loan.principalAdjustments||[]).forEach(a=>{const d=parseDate(a.date);if(d&&d>=month&&d<periodEnd) events.push({type:"adjustment",date:d,value:numeric(a.amount),source:a});});
+      (loan.payments||[]).forEach(payment=>getPaymentDates(payment).forEach(t=>{const d=new Date(t);if(d>=month&&d<periodEnd) events.push({type:"payment",date:d,value:Math.max(0,numeric(payment.amount)),payment});}));
+      events.sort((a,b)=>a.date-b.date || ({draw:0,rate:1,adjustment:2,payment:3}[a.type]-({draw:0,rate:1,adjustment:2,payment:3}[b.type])));
+      let cursor = new Date(month < start ? start : month), interest=0, payment=0, amortization=0, allocations=[], changes=[];
+      states.forEach(s => { s.monthInterest = 0; });
+      const accrue = date => { const days = thirty360 ? days360US(cursor, date) : daysBetween(cursor,date);
+        if(days) states.forEach(s=>{ if(s.active && s.balance>0) { const value=s.balance*(partRate(s.part,cursor)/100)*days/denominator; s.accrued+=value; s.monthInterest+=value; interest+=value; }}); cursor=new Date(date); };
+      for (const e of events) { accrue(e.date); if(e.type === "draw") { e.state.active=true; e.state.balance=e.state.part.originalPrincipal; changes.push({type:"loanPart",partId:e.state.part.id,value:e.state.balance,date:new Date(e.date)}); }
+        else if(e.type === "adjustment") { const applied=allocateProRata(states, -e.value, e.source.targetPartIds); amortization += applied.reduce((x,a)=>x+a.principal,0); changes.push({type:"principalAdjustment",value:e.value,date:new Date(e.date),allocations:applied}); }
+        else if(e.type === "payment") { const interestParts=allocateAccruedInterest(states,e.value,e.payment.targetPartIds); const interestPaid=interestParts.reduce((sum,part)=>sum+part.interest,0); const principalParts=allocateProRata(states,e.value-interestPaid,e.payment.targetPartIds); const principal=principalParts.reduce((sum,part)=>sum+part.principal,0); const actual=interestPaid+principal; amortization+=principal; payment+=actual; allocations.push({date:new Date(e.date), policy:e.payment.allocationPolicy || "proRata", amount:actual, plannedAmount:e.value, targetPartIds:e.payment.targetPartIds || null, parts:mergePartAllocations(interestParts,principalParts)}); }
+      }
+      accrue(periodEnd);
+      // Non-compounding interest remains a separate liability. Only parts that
+      // explicitly compound capitalize their accrued interest at a period end.
+      states.forEach(s => {
+        if (s.part.compoundInterest && s.accrued) {
+          s.balance += s.accrued;
+          s.accrued = 0;
+        }
+      });
+      const endingDebt=states.reduce((x,s)=>x+s.balance+s.accrued,0); const startingDebt=timeline.length ? timeline.at(-1).endingDebt : 0;
+      if (states.some(s=>s.active) || events.length) timeline.push({date:new Date(month),paymentDate:allocations[0]?.date || new Date(month),startingDebt,interestRate: endingDebt ? states.reduce((x,s)=>x+s.balance*partRate(s.part,periodEnd),0)/endingDebt : 0,changes,interest,payment,amortization,endingDebt,paymentAllocations:allocations,partBalances:states.filter(s=>s.active).map(s=>({partId:s.part.id,originalPrincipal:s.part.originalPrincipal,startDate:s.part.startDate,interestRate:partRate(s.part,periodEnd),balance:s.balance,accruedInterest:s.accrued,interest:s.monthInterest}))});
+      if (close && periodEnd >= close) break; if (endingDebt <= .000001 && states.every(s=>s.active || parseDate(s.part.startDate)<end)) break; month=nextMonthStart(month);
+    } return timeline;
+  }
+  function buildTimelineAdvanced(loan, options = {}) { return isCanonicalLoan(loan) ? buildCanonicalTimeline(loan, options) : buildTimelineAdvancedLegacy(loan, options); }
+  function buildTimeline(loan, options = {}) { return isCanonicalLoan(loan) ? buildCanonicalTimeline(loan, options) : buildTimelineLegacy(loan, options); }
+
   function calculatePaymentForTargetDate(loan, targetDateStr, options = {}) {
+    if (isCanonicalLoan(loan)) {
+      const start = canonicalStart(loan), target = parseDate(targetDateStr);
+      if (!start || !target || target <= start) return null;
+      const principal = loan.loanParts.reduce((sum, part) => sum + numeric(part.originalPrincipal), 0);
+      let low = 0, high = principal * 2 + 500000;
+      for (let iteration = 0; iteration < 60; iteration++) {
+        const amount = (low + high) / 2;
+        const timeline = buildCanonicalTimeline({ ...loan, payments: [{ type: "scheduled", amount, startDate: isoDate(start), endDate: targetDateStr, frequency: 1, frequencyUnit: "month", dayOfMonth: String(start.getDate()), allocationPolicy: "proRata" }] }, options);
+        const last = timeline.at(-1);
+        if (!last || last.endingDebt > .01 || last.date > monthStart(target)) low = amount; else high = amount;
+        if (high - low < 1) break;
+      }
+      return Math.ceil(high * 100) / 100;
+    }
     const convention = normalizeDayCountConvention(options.dayCountConvention || loan?.dayCountConvention);
     if (convention === DAY_COUNT_CONVENTIONS.ACTUAL_365) {
       return calculatePaymentForTargetDateAdvanced(loan, targetDateStr, { ...options, denominator: 365 });
@@ -553,6 +932,14 @@
     MAX_MONTHS,
     buildTimeline,
     buildTimelineAdvanced,
+    buildCanonicalTimeline,
+    normalizeLoan,
+    buildCanonicalLoan,
+    facilityEditorModel,
+    buildCanonicalLoanFromEditor,
+    analyzeLoanCombination,
+    combineLoans,
+    uncombineLoan,
     calculatePaymentForTargetDate,
     calculatePaymentForTargetDateAdvanced,
     getLastWeekdayOfMonth,

@@ -123,6 +123,21 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+/** Render persisted context for an interest or principal change safely. */
+function changeContextAttributes(change) {
+  return `data-title="${escapeHtml(change?.title || "")}" data-note="${escapeHtml(change?.note || "")}"`;
+}
+function changeTitleMarkup(change) {
+  return change?.title ? `<strong class="change-item-title">${escapeHtml(change.title)}</strong>` : "";
+}
+function changeTooltipMarkup(change, detail) {
+  return [
+    change?.title ? `<strong class="tooltip-title">${escapeHtml(change.title)}</strong>` : "",
+    `<span>${escapeHtml(detail)}</span>`,
+    change?.note ? `<span class="tooltip-note">${escapeHtml(change.note)}</span>` : ""
+  ].filter(Boolean).join("");
+}
+
 /** Auth and user profile (display name, recovery email, MFA) */
 const AuthService = {
   async signIn(email, password) {
@@ -370,10 +385,31 @@ const LanguageService = {
   translations: {
     sv: {
       myLoans: 'Mina lån',
+      combineLoans: 'Kombinera lån',
+      combineLoansIntro: 'Välj lån som hör ihop. De blir en gemensam översikt medan varje lånedel behåller sin egen ränta och historik.',
+      chooseLoans: 'Välj lån',
+      combinedLoanName: 'Namn på det kombinerade lånet',
+      beforeCombining: 'Innan du kombinerar',
+      combineLoansConfirm: 'Jag förstår att detta skapar en gemensam översikt, inte ett nytt låneavtal eller en refinansiering.',
+      combineSelectedLoans: 'Kombinera valda lån',
+      uncombineLoans: 'Dela upp kombinerat lån',
+      uncombineLoansTitle: 'Dela upp detta kombinerade lån?',
+      uncombineLoansMessage: 'De ursprungliga lånen återställs exakt som de var när de kombinerades. Ändringar som gjorts i den kombinerade översikten efteråt tas bort.',
+      combinedFacility: 'Kombinerad översikt',
+      combinedFrom: 'Består av',
+      loansCombined: 'Lånen kombinerades.',
+      loansUncombined: 'De ursprungliga lånen återställdes.',
+      selectAtLeastTwoLoans: 'Välj minst två lån.',
+      combineWarningOverview: 'Detta blir en gemensam översikt. Ursprungslånen visas inte längre som separata kort.',
+      combineWarningRates: 'Varje lånedel behåller sin ursprungliga ränta, räntehistorik och beräkning.',
+      combineWarningSchedules: 'Befintliga betalningsplaner behålls och fortsätter att gälla för sina ursprungliga lånedelar.',
+      combineWarningAllocation: 'Nya betalningar utan vald lånedel fördelas proportionellt mellan aktiva lånedelar.',
       totalMonthly: 'Total månadsbetalning',
       totalDebt: 'Total skuld',
       loan: 'lån',
       loans: 'lån',
+      loanPart: 'lånedel',
+      loanParts: 'lånedelar',
       addLoan: 'Lägg till Lån',
       noLoans: 'Inga lån registrerade. Lägg till ett nytt lån ovan eller importera lån från en fil under inställningar.',
       editLoan: 'Redigera Lån',
@@ -545,6 +581,8 @@ const LanguageService = {
       tooltipLoanIncrease: 'Lån ökat med',
       tooltipLoanDecrease: 'Lån minskat med',
       tooltipInterestChange: 'Ränta ändrad till',
+      changeTitle: 'Titel',
+      changeNote: 'Anteckning',
       noAmortizationPlan: 'Amorteringsplan saknas',
       importWarning: 'Varning: Överlappande lån',
       importWarningMessage: 'Följande lån kommer att skrivas över:',
@@ -671,8 +709,8 @@ const LanguageService = {
       sharedLoanBanner: '{name} delar detta lån med dig.',
       sharedLoanSaveChanges: 'Spara ändringar',
       sharedLinkExpired: 'Länken har gått ut eller är ogiltig.',
-      newVersionAvailable: 'Ny version tillgänglig',
-      newVersionAvailableMessage: 'Det finns en ny version av sidan. Tryck på Uppdatera för att ladda den.',
+      newVersionAvailable: 'Lendpile har fått en uppdatering',
+      newVersionAvailableMessage: 'Tryck på Uppdatera för att hämta den senaste versionen. Dina sparade uppgifter påverkas inte.',
       updateToLoad: 'Uppdatera',
       sharedLinkUsedByOther: 'Denna länk har redan använts av någon annan.',
       someone: 'Någon',
@@ -761,10 +799,31 @@ const LanguageService = {
     },
     en: {
       myLoans: 'My Loans',
+      combineLoans: 'Combine loans',
+      combineLoansIntro: 'Choose loans that belong together. They will become one overview while each loan part keeps its own rate and history.',
+      chooseLoans: 'Choose loans',
+      combinedLoanName: 'Name for the combined loan',
+      beforeCombining: 'Before combining',
+      combineLoansConfirm: 'I understand that this creates one overview, not a new loan agreement or refinance.',
+      combineSelectedLoans: 'Combine selected loans',
+      uncombineLoans: 'Uncombine loans',
+      uncombineLoansTitle: 'Uncombine this facility?',
+      uncombineLoansMessage: 'The original loans will be restored exactly as they were when combined. Changes made in the combined overview afterward will be removed.',
+      combinedFacility: 'Combined overview',
+      combinedFrom: 'Contains',
+      loansCombined: 'The loans were combined.',
+      loansUncombined: 'The original loans were restored.',
+      selectAtLeastTwoLoans: 'Select at least two loans.',
+      combineWarningOverview: 'This becomes one overview. The original loans will no longer appear as separate cards.',
+      combineWarningRates: 'Each loan part keeps its original rate, rate history, and calculation.',
+      combineWarningSchedules: 'Existing payment schedules remain attached to their original loan parts.',
+      combineWarningAllocation: 'New payments without a selected loan part are allocated proportionally across active parts.',
       totalMonthly: 'Total monthly',
       totalDebt: 'Total debt',
       loan: 'loan',
       loans: 'loans',
+      loanPart: 'loan part',
+      loanParts: 'loan parts',
       addLoan: 'Add Loan',
       noLoans: 'No loans registered. Add a new loan above or import loans from a file under settings.',
       editLoan: 'Edit Loan',
@@ -936,6 +995,8 @@ const LanguageService = {
       tooltipLoanIncrease: 'Loan increased by',
       tooltipLoanDecrease: 'Loan decreased by',
       tooltipInterestChange: 'Interest changed to',
+      changeTitle: 'Title',
+      changeNote: 'Note',
       noAmortizationPlan: 'No amortization plan set up',
       importWarning: 'Warning: Overlapping Loans',
       importWarningMessage: 'The following loans will be overwritten:',
@@ -1062,8 +1123,8 @@ const LanguageService = {
       sharedLoanBanner: '{name} shared this loan with you.',
       sharedLoanSaveChanges: 'Save changes',
       sharedLinkExpired: 'This link has expired or is invalid.',
-      newVersionAvailable: 'New version available',
-      newVersionAvailableMessage: 'There is a new version of this page available. Press Update to load it.',
+      newVersionAvailable: 'Lendpile has received an update',
+      newVersionAvailableMessage: 'Press Update to get the latest version. Your saved data will not be affected.',
       updateToLoad: 'Update',
       sharedLinkUsedByOther: 'This link has already been used by someone else.',
       someone: 'Someone',
@@ -1181,7 +1242,13 @@ const LanguageService = {
 const StorageService = {
   save(key, data) {
     try {
-      localStorage.setItem(key, JSON.stringify(data));
+      // Persist only the canonical facility schema. Loading an old browser or
+      // account snapshot therefore performs the focused one-time migration on
+      // its next save/sync, without retaining competing calculation fields.
+      const value = key === "loanData" && Array.isArray(data)
+        ? data.map(loan => LendpileCalculations.normalizeLoan(loan))
+        : data;
+      localStorage.setItem(key, JSON.stringify(value));
       return true;
     } catch (e) {
       console.error("Error saving data:", e);
@@ -1191,7 +1258,11 @@ const StorageService = {
   load(key) {
     try {
       const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : [];
+      const value = data ? JSON.parse(data) : [];
+      if (key !== "loanData" || !Array.isArray(value)) return value;
+      const normalized = value.map(loan => LendpileCalculations.normalizeLoan(loan));
+      if (JSON.stringify(normalized) !== JSON.stringify(value)) localStorage.setItem(key, JSON.stringify(normalized));
+      return normalized;
     } catch (e) {
       console.error("Error loading data:", e);
       return [];
@@ -1470,13 +1541,12 @@ function saveStartPageExcluded(names) {
 }
 
 function getLoanDebtFallbackAtDate(loan, asOfDate = new Date()) {
+  const canonical = LendpileCalculations.normalizeLoan(loan);
+  const timeline = LendpileCalculations.buildTimeline(canonical);
   const cutoff = new Date(asOfDate);
   cutoff.setHours(0, 0, 0, 0);
-  return (loan.initialAmount || 0) + (loan.loanChanges || []).reduce((sum, change) => {
-    const changeDate = new Date(change.date);
-    changeDate.setHours(0, 0, 0, 0);
-    return changeDate <= cutoff ? sum + (parseFloat(change.amount) || 0) : sum;
-  }, 0);
+  const row = timeline.filter(item => item.date <= cutoff).at(-1);
+  return row ? row.endingDebt : 0;
 }
 
 function getLoanDayCountConventionForDisplay(loan) {
@@ -1624,6 +1694,18 @@ const UIHandler = {
     });
     document.getElementById("add-loan-btn").addEventListener("click", () => {
       FormHandler.openLoanModal();
+    });
+    document.getElementById("combine-loans-btn")?.addEventListener("click", () => CombineLoansHandler.open());
+    document.getElementById("combine-loan-options")?.addEventListener("change", () => CombineLoansHandler.update());
+    document.getElementById("combine-loan-name")?.addEventListener("input", event => {
+      event.target.dataset.autogenerated = "false";
+      CombineLoansHandler.update();
+    });
+    document.getElementById("combine-loans-confirm")?.addEventListener("change", () => CombineLoansHandler.update());
+    document.getElementById("cancel-combine-loans-btn")?.addEventListener("click", () => CombineLoansHandler.close());
+    document.getElementById("combine-loans-form")?.addEventListener("submit", event => {
+      event.preventDefault();
+      CombineLoansHandler.submit();
     });
     document.querySelectorAll(".loan-type-toggle [data-loan-type]").forEach(btn => {
       btn.addEventListener("click", function() {
@@ -1786,6 +1868,8 @@ const UIHandler = {
     const loansList = document.getElementById("loans-list");
     const summaryEl = document.getElementById("list-summary");
     const merged = this.getMergedLoansList();
+    const combineButton = document.getElementById("combine-loans-btn");
+    if (combineButton) combineButton.classList.toggle("hidden", (StorageService.load("loanData") || []).length < 2);
     if (!merged.length) {
       if (summaryEl) summaryEl.innerHTML = "";
       loansList.innerHTML = `<p>${LanguageService.translate("noLoans")}</p>`;
@@ -1867,6 +1951,9 @@ const UIHandler = {
     const debtLabel = isLend ? LanguageService.translate("owedToYou") : LanguageService.translate("remainingDebt");
     const isShared = !!loan._shared;
     const typeLabel = (loan.loanType === "lend" ? LanguageService.translate("badgeLending") : LanguageService.translate("badgeBorrowing"));
+    const uncombineMenuItem = loan.combination?.sources?.length > 1
+      ? `<button type="button" role="menuitem" data-action="uncombine" data-loan-index="${index}">${LanguageService.translate("uncombineLoans")}</button>`
+      : "";
     const menuHtml = isShared
       ? `<div class="loan-detail-menu-wrap">
             <button type="button" class="loan-detail-menu-btn" data-loan-index="${index}" data-action="menu" aria-haspopup="true" aria-expanded="false">
@@ -1885,6 +1972,7 @@ const UIHandler = {
             <div class="loan-detail-menu" role="menu">
               <button type="button" role="menuitem" data-action="edit" data-loan-index="${index}">${LanguageService.translate("edit")}</button>
               <button type="button" role="menuitem" data-action="duplicate" data-loan-index="${index}">${LanguageService.translate("duplicate")}</button>
+              ${uncombineMenuItem}
               <button type="button" role="menuitem" data-action="delete" data-loan-index="${index}">${LanguageService.translate("delete")}</button>
             </div>
           </div>`;
@@ -2000,10 +2088,14 @@ const UIHandler = {
       headerMenuWrap.style.display = "";
       const menu = headerMenuWrap.querySelector(".overview-detail-menu");
       if (menu) {
+        const uncombineAction = loan.combination?.sources?.length > 1
+          ? `<button type="button" role="menuitem" data-action="uncombine">${LanguageService.translate("uncombineLoans")}</button>`
+          : "";
         menu.innerHTML = `
           <button type="button" role="menuitem" data-action="edit">${LanguageService.translate("edit")}</button>
           <button type="button" role="menuitem" data-action="share">${LanguageService.translate("shareLoan")}</button>
           <button type="button" role="menuitem" data-action="duplicate">${LanguageService.translate("duplicate")}</button>
+          ${uncombineAction}
           <button type="button" role="menuitem" data-action="delete">${LanguageService.translate("delete")}</button>
         `;
       }
@@ -2090,7 +2182,12 @@ const UIHandler = {
     const forecast = fullTimeline.filter(row => row.date >= today);
     const currentRow = historical.length ? historical[historical.length - 1] : null;
     const currentDebt = currentRow ? currentRow.endingDebt : getLoanDebtFallbackAtDate(loan, today);
-    const currentRate = currentRow ? currentRow.interestRate : loan.interestRate || 0;
+    const canonicalLoan = LendpileCalculations.normalizeLoan(loan);
+    const currentParts = currentRow?.partBalances || canonicalLoan.loanParts.map(part => ({
+      id: part.id, originalPrincipal: part.originalPrincipal, startDate: part.startDate,
+      rate: part.interestRate, balance: part.originalPrincipal, accruedInterest: 0,
+      currentDebt: part.originalPrincipal
+    }));
     const interestChangesSorted = (loan.interestChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
     const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const nextChange = interestChangesSorted.find(ch => new Date(ch.date) >= firstDayOfCurrentMonth);
@@ -2113,14 +2210,21 @@ const UIHandler = {
           <span class="overview-label">${escapeHtml(UIHandler.formatDate(ch.date))}</span>
           <span class="overview-value">${escapeHtml(String(ch.rate))}%</span>
         </div>`).join("");
-    const loanChangesSorted = (loan.loanChanges || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
-    const loanChangeRows = (!loan.loanChanges || !loan.loanChanges.length)
-      ? `<div class="overview-row"><span class="overview-label">-</span><span class="overview-value">-</span></div>`
-      : loanChangesSorted.map(ch => `
-        <div class="overview-row">
-          <span class="overview-label">${escapeHtml(UIHandler.formatDate(ch.date))}</span>
-          <span class="overview-value">${UIHandler.formatCurrency(ch.amount, loan.currency)}</span>
-        </div>`).join("");
+    const loanPartRows = currentParts.map((part, i) => `
+      <div class="overview-row loan-part-row">
+        <span class="overview-label">${escapeHtml(part.label || `Part ${i + 1}`)} · ${escapeHtml(UIHandler.formatDate(part.startDate))} · ${Number(part.interestRate ?? part.rate ?? 0).toFixed(2)}%</span>
+        <span class="overview-value">${UIHandler.formatCurrency(part.originalPrincipal, loan.currency)} → ${UIHandler.formatCurrency(part.balance, loan.currency)}<br><small>Interest: ${UIHandler.formatCurrency(part.accruedInterest || 0, loan.currency)} · Balance: ${UIHandler.formatCurrency(part.currentDebt ?? ((part.balance || 0) + (part.accruedInterest || 0)), loan.currency)}</small></span>
+      </div>`).join("");
+    const facilityTotals = `Original principal: ${UIHandler.formatCurrency(canonicalLoan.loanParts.reduce((sum, part) => sum + Number(part.originalPrincipal || 0), 0), loan.currency)} · Current principal: ${UIHandler.formatCurrency(currentParts.reduce((sum, part) => sum + Number(part.balance || 0), 0), loan.currency)} · Accrued interest: ${UIHandler.formatCurrency(currentParts.reduce((sum, part) => sum + Number(part.accruedInterest || 0), 0), loan.currency)} · Total debt: ${UIHandler.formatCurrency(currentDebt, loan.currency)}`;
+    const combinedSources = loan.combination?.sources || [];
+    const combinedOverviewCard = combinedSources.length > 1 ? `
+      <div class="overview-card">
+        <h4 class="overview-card-title">${LanguageService.translate("combinedFacility")}</h4>
+        <div class="overview-card-content">
+          <p>${LanguageService.translate("combinedFrom")} ${combinedSources.length} ${LanguageService.translate("loan")}.</p>
+          <ul class="combined-source-list">${combinedSources.map(source => `<li>${escapeHtml(source.name || "Loan")}</li>`).join("")}</ul>
+        </div>
+      </div>` : "";
     const forecastContent = (!loan.payments || loan.payments.length === 0)
       ? `<div class="overview-row"><span class="overview-label">${LanguageService.translate("noAmortizationPlan")}</span><span class="overview-value">-</span></div>`
       : `
@@ -2132,11 +2236,10 @@ const UIHandler = {
     const debtLabel = isLend ? LanguageService.translate("owedToYou") : LanguageService.translate("remainingDebt");
     const monthlyLabel = isLend ? LanguageService.translate("incomingThisMonth") : LanguageService.translate("paymentThisMonth");
     const statusRows = [
-      { label: LanguageService.translate("startDate"), value: UIHandler.formatDate(loan.startDate) },
-      { label: LanguageService.translate("initialAmount"), value: UIHandler.formatCurrency(loan.initialAmount, loan.currency) },
+      { label: LanguageService.translate("startDate"), value: UIHandler.formatDate(canonicalLoan.loanParts.map(part => part.startDate).filter(Boolean).sort()[0]) },
+      { label: LanguageService.translate("initialAmount"), value: UIHandler.formatCurrency(canonicalLoan.loanParts.reduce((sum, part) => sum + Number(part.originalPrincipal || 0), 0), loan.currency) },
       { label: LanguageService.translate("dayCountConvention"), value: formatDayCountConvention(loan.dayCountConvention) },
       { label: debtLabel, value: UIHandler.formatCurrency(currentDebt, loan.currency) },
-      { label: LanguageService.translate("currentRate"), value: currentRate.toFixed(2) + "%" },
       ...(upcomingRateLabel ? [{ label: upcomingRateLabel, value: upcomingRateValue }] : [])
     ].map(r => `<div class="overview-row"><span class="overview-label">${r.label}</span><span class="overview-value">${r.value}</span></div>`).join("");
     return `
@@ -2147,8 +2250,8 @@ const UIHandler = {
             <span class="overview-summary-label">${debtLabel}</span>
           </div>
           <div class="overview-summary-item">
-            <span class="overview-summary-value">${currentRate.toFixed(2)}%</span>
-            <span class="overview-summary-label">${LanguageService.translate("currentRate")}</span>
+            <span class="overview-summary-value">${currentParts.length}</span>
+            <span class="overview-summary-label">Loan parts</span>
           </div>
           <div class="overview-summary-item">
             <span class="overview-summary-value">${monthsRemaining}</span>
@@ -2164,6 +2267,7 @@ const UIHandler = {
           </div>
         </div>
         <div class="overview-cards">
+          ${combinedOverviewCard}
           <div class="overview-card">
             <h4 class="overview-card-title">${LanguageService.translate("currentStatus")}</h4>
             ${statusRows}
@@ -2181,8 +2285,8 @@ const UIHandler = {
             ${interestRows}
           </div>
           <div class="overview-card">
-            <h4 class="overview-card-title">${LanguageService.translate("loanChanges")}</h4>
-            ${loanChangeRows}
+            <h4 class="overview-card-title">Loan parts</h4>
+            <div class="overview-card-content"><p>${facilityTotals}</p>${loanPartRows}</div>
           </div>
         </div>
       </div>
@@ -2348,14 +2452,14 @@ const UIHandler = {
     if (row.changes) {
       const loanChange = row.changes.find(ch => ch.type === "loan");
       if (loanChange) {
-        const isIncrease = loanChange.value > 0;
+        const enteredValue = loanChange.enteredValue ?? loanChange.value;
+        const isIncrease = enteredValue > 0;
+        const changeDetail = `${LanguageService.translate(isIncrease ? 'tooltipLoanIncrease' : 'tooltipLoanDecrease')} ${UIHandler.formatCurrency(Math.abs(enteredValue), currency)}`;
         debtCell = `<span class="tooltip-container">
                       <span class="material-icons ${isIncrease ? 'increase-icon' : 'decrease-icon'}">
                         ${isIncrease ? 'arrow_upward' : 'arrow_downward'}
                       </span>
-                      <span class="tooltip-text">
-                        ${LanguageService.translate(isIncrease ? 'tooltipLoanIncrease' : 'tooltipLoanDecrease')} ${isIncrease ? loanChange.value : Math.abs(loanChange.value)}
-                      </span>
+                      <span class="tooltip-text">${changeTooltipMarkup(loanChange, changeDetail)}</span>
                     </span> ${UIHandler.formatCurrency(row.endingDebt, currency)}`;
       }
     }
@@ -2366,11 +2470,10 @@ const UIHandler = {
     if (row.changes) {
       const interestChange = row.changes.find(ch => ch.type === "interest");
       if (interestChange) {
+        const changeDetail = `${LanguageService.translate('tooltipInterestChange')} ${interestChange.value}%`;
         interestRateCell = `<span class="tooltip-container">
                               <span class="material-icons interest-icon">sync</span>
-                              <span class="tooltip-text">
-                                ${LanguageService.translate('tooltipInterestChange')} ${interestChange.value}%
-                              </span>
+                              <span class="tooltip-text">${changeTooltipMarkup(interestChange, changeDetail)}</span>
                             </span> ${row.interestRate.toFixed(2)}%`;
       }
     }
@@ -2986,6 +3089,128 @@ const UIHandler = {
   }
 };
 
+const CombineLoansHandler = {
+  selectedIndexes() {
+    return Array.from(document.querySelectorAll("#combine-loan-options input:checked"))
+      .map(input => Number(input.value))
+      .filter(Number.isInteger);
+  },
+  currentDebt(loan) {
+    const timeline = CalculationService.buildTimeline(loan);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const row = timeline.filter(item => item.date < today).at(-1);
+    if (row) return Number(row.endingDebt || 0);
+    return LendpileCalculations.normalizeLoan(loan).loanParts.reduce((sum, part) => sum + Number(part.originalPrincipal || 0), 0);
+  },
+  open() {
+    const loans = StorageService.load("loanData") || [];
+    if (loans.length < 2) return;
+    const options = document.getElementById("combine-loan-options");
+    options.innerHTML = loans.map((loan, index) => {
+      const canonical = LendpileCalculations.normalizeLoan(loan);
+      const debt = this.currentDebt(canonical);
+      const type = (canonical.loanType || "borrow") === "lend" ? LanguageService.translate("badgeLending") : LanguageService.translate("badgeBorrowing");
+      return `<label class="combine-loan-option">
+        <input type="checkbox" value="${index}">
+        <span class="combine-loan-option-main">
+          <span class="combine-loan-option-name">${escapeHtml(canonical.name || "Loan")}</span>
+          <span class="combine-loan-option-meta">${escapeHtml(type)} · ${canonical.loanParts.length} ${escapeHtml(LanguageService.translate(canonical.loanParts.length === 1 ? "loanPart" : "loanParts"))} · ${escapeHtml(formatDayCountConvention(canonical.dayCountConvention))}</span>
+        </span>
+        <span class="combine-loan-option-amount">${UIHandler.formatCurrency(debt, canonical.currency)}</span>
+      </label>`;
+    }).join("");
+    const name = document.getElementById("combine-loan-name");
+    name.value = "";
+    name.dataset.autogenerated = "true";
+    document.getElementById("combine-loans-confirm").checked = false;
+    this.update();
+    UIHandler.showModal("combine-loans-modal");
+  },
+  update() {
+    const loans = StorageService.load("loanData") || [];
+    const indexes = this.selectedIndexes();
+    const selected = indexes.map(index => loans[index]).filter(Boolean);
+    const analysis = LendpileCalculations.analyzeLoanCombination(selected);
+    const feedback = document.getElementById("combine-loans-feedback");
+    const review = document.getElementById("combine-loans-review");
+    const nameWrap = document.getElementById("combine-name-wrap");
+    const nameInput = document.getElementById("combine-loan-name");
+    const confirmation = document.getElementById("combine-loans-confirm");
+    const submit = document.getElementById("confirm-combine-loans-btn");
+    const ready = selected.length >= 2 && analysis.errors.length === 0;
+    feedback.textContent = selected.length < 2 ? LanguageService.translate("selectAtLeastTwoLoans") : analysis.errors.join(" ");
+    review.classList.toggle("hidden", !ready);
+    nameWrap.classList.toggle("hidden", !ready);
+    if (ready) {
+      const suggested = selected.map(loan => loan.name).filter(Boolean).join(" + ");
+      if (nameInput.dataset.autogenerated === "true" || !nameInput.value.trim()) nameInput.value = suggested;
+      const totalDebt = selected.reduce((sum, loan) => sum + this.currentDebt(loan), 0);
+      const loanLabel = LanguageService.translate(analysis.sourceCount === 1 ? "loan" : "loans");
+      const partLabel = LanguageService.translate(analysis.partCount === 1 ? "loanPart" : "loanParts");
+      document.getElementById("combine-loans-summary").textContent = `${analysis.sourceCount} ${loanLabel} · ${analysis.partCount} ${partLabel} · ${UIHandler.formatCurrency(totalDebt, analysis.currency)}`;
+      document.getElementById("combine-loans-warnings").innerHTML = [
+        "combineWarningOverview", "combineWarningRates", "combineWarningSchedules", "combineWarningAllocation"
+      ].map(key => `<li>${escapeHtml(LanguageService.translate(key))}</li>`).join("");
+    } else {
+      confirmation.checked = false;
+    }
+    submit.disabled = !ready || !confirmation.checked || !nameInput.value.trim();
+  },
+  close() {
+    UIHandler.closeModal("combine-loans-modal");
+  },
+  async submit() {
+    const loans = StorageService.load("loanData") || [];
+    const indexes = this.selectedIndexes().sort((a, b) => a - b);
+    const selected = indexes.map(index => loans[index]).filter(Boolean);
+    const analysis = LendpileCalculations.analyzeLoanCombination(selected);
+    const name = document.getElementById("combine-loan-name").value.trim();
+    if (analysis.errors.length || selected.length < 2 || !name || !document.getElementById("combine-loans-confirm").checked) {
+      this.update();
+      return;
+    }
+    const combined = LendpileCalculations.combineLoans(selected, { id: crypto.randomUUID(), name });
+    const insertAt = indexes[0];
+    const selectedSet = new Set(indexes);
+    const updated = loans.filter((_loan, index) => !selectedSet.has(index));
+    updated.splice(insertAt, 0, combined);
+    if (!StorageService.save("loanData", updated)) {
+      UIHandler.showFeedback(LanguageService.translate("changesNotSaved"));
+      return;
+    }
+    if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
+    this.close();
+    UIHandler.currentDetailLoanIndex = null;
+    UIHandler.showLoanList();
+    UIHandler.showLoanDetail(insertAt);
+    UIHandler.showFeedback(LanguageService.translate("loansCombined"));
+  },
+  uncombine(index) {
+    const loans = StorageService.load("loanData") || [];
+    const loan = loans[index];
+    if (!loan?.combination?.sources?.length) return;
+    UIHandler.showConfirmModal({
+      title: LanguageService.translate("uncombineLoansTitle"),
+      message: LanguageService.translate("uncombineLoansMessage"),
+      confirmLabel: LanguageService.translate("uncombineLoans"),
+      confirmClass: "btn-delete",
+      onConfirm: async () => {
+        const current = StorageService.load("loanData") || [];
+        const restored = LendpileCalculations.uncombineLoan(current[index]);
+        current.splice(index, 1, ...restored);
+        if (!StorageService.save("loanData", current)) {
+          UIHandler.showFeedback(LanguageService.translate("changesNotSaved"));
+          return;
+        }
+        if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
+        UIHandler.showLoanList();
+        UIHandler.showFeedback(LanguageService.translate("loansUncombined"));
+      }
+    });
+  }
+};
+
 /********************************************************
  * 5. FORM HANDLER
  ********************************************************/
@@ -3019,7 +3244,7 @@ const FormHandler = {
     const loanTypeInput = form.querySelector("#loanType");
     if (index !== null) {
       const loans = StorageService.load("loanData");
-      const loan = loans[index];
+      const loan = LendpileCalculations.facilityEditorModel(loans[index]);
       const loanType = loan.loanType === "lend" ? "lend" : "borrow";
       if (borrowBtn) { borrowBtn.classList.toggle("active", loanType === "borrow"); lendBtn.classList.toggle("active", loanType === "lend"); }
       if (loanTypeInput) loanTypeInput.value = loanType;
@@ -3044,7 +3269,8 @@ const FormHandler = {
         const div = document.createElement("div");
         div.className = "change-item";
         div.innerHTML = `
-          <div class="change-item-details">
+          <div class="change-item-details" ${changeContextAttributes(ch)}>
+            ${changeTitleMarkup(ch)}
             <span data-date="${escapeHtml(ch.date)}">${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
             <span data-rate="${escapeHtml(String(ch.rate))}">${LanguageService.translate("rate")}: ${escapeHtml(String(ch.rate))}%</span>
           </div>
@@ -3066,8 +3292,10 @@ const FormHandler = {
         loan.loanChanges.forEach((ch, itemIdx) => {
           const div = document.createElement("div");
           div.className = "change-item";
+          div._facilityChange = ch;
           div.innerHTML = `
-            <div class="change-item-details">
+            <div class="change-item-details" ${changeContextAttributes(ch)}>
+              ${changeTitleMarkup(ch)}
               <span data-date="${escapeHtml(ch.date)}">${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
               <span data-amount="${escapeHtml(String(ch.amount))}">${LanguageService.translate("amount")}: ${escapeHtml(String(ch.amount))}</span>
             </div>
@@ -3120,7 +3348,7 @@ const FormHandler = {
   openLoanModalForSharedLoan() {
     if (!UIHandler.currentShare || !UIHandler.currentShare.share) return;
     const share = UIHandler.currentShare.share;
-    const loan = share.loan_snapshot;
+    const loan = LendpileCalculations.facilityEditorModel(share.loan_snapshot);
     if (!loan) return;
     const modal = document.getElementById("loan-modal");
     const form = document.getElementById("loan-form-modal");
@@ -3170,7 +3398,8 @@ const FormHandler = {
       const div = document.createElement("div");
       div.className = "change-item";
       div.innerHTML = `
-        <div class="change-item-details">
+        <div class="change-item-details" ${changeContextAttributes(ch)}>
+          ${changeTitleMarkup(ch)}
           <span data-date="${escapeHtml(ch.date)}">${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
           <span data-rate="${escapeHtml(String(ch.rate))}">${LanguageService.translate("rate")}: ${escapeHtml(String(ch.rate))}%</span>
         </div>
@@ -3191,8 +3420,10 @@ const FormHandler = {
     (loan.loanChanges || []).forEach((ch, itemIdx) => {
       const div = document.createElement("div");
       div.className = "change-item";
+      div._facilityChange = ch;
       div.innerHTML = `
-        <div class="change-item-details">
+        <div class="change-item-details" ${changeContextAttributes(ch)}>
+          ${changeTitleMarkup(ch)}
           <span data-date="${escapeHtml(ch.date)}">${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
           <span data-amount="${escapeHtml(String(ch.amount))}">${LanguageService.translate("amount")}: ${escapeHtml(String(ch.amount))}</span>
         </div>
@@ -3266,7 +3497,8 @@ const FormHandler = {
       const div = document.createElement("div");
       div.className = "change-item";
       div.innerHTML = `
-        <div class="change-item-details">
+        <div class="change-item-details" ${changeContextAttributes(ch)}>
+          ${changeTitleMarkup(ch)}
           <span>${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
           <span>${LanguageService.translate("rate")}: ${escapeHtml(String(ch.rate))}%</span>
         </div>
@@ -3277,7 +3509,8 @@ const FormHandler = {
       const div = document.createElement("div");
       div.className = "change-item";
       div.innerHTML = `
-        <div class="change-item-details">
+        <div class="change-item-details" ${changeContextAttributes(ch)}>
+          ${changeTitleMarkup(ch)}
           <span>${LanguageService.translate("date")}: ${escapeHtml(ch.date)}</span>
           <span>${LanguageService.translate("amount")}: ${escapeHtml(String(ch.amount))}</span>
         </div>
@@ -3346,6 +3579,8 @@ const FormHandler = {
         const changeType = document.getElementById("changeType").value;
         const date = document.getElementById("changeDate").value;
         const valueRaw = document.getElementById("changeValue").value;
+        const title = document.getElementById("changeTitle").value.trim();
+        const note = document.getElementById("changeNote").value.trim();
         const value = changeType === "interest" ? (valueRaw === "" || isNaN(parseFloat(valueRaw)) ? 0 : Math.max(0, parseFloat(valueRaw))) : parseFloat(valueRaw);
         if (!date || (changeType !== "interest" && isNaN(value))) return;
         if (changeType === "interest") {
@@ -3359,10 +3594,13 @@ const FormHandler = {
         const containerId = (changeType === "interest") ? "interest-changes-list" : "loan-changes-list";
         const listEl = document.getElementById(containerId);
         const isEdit = editIndex !== null && editIndex !== "" && !isNaN(parseInt(editIndex, 10));
+        const existingRow = isEdit ? listEl.children[parseInt(editIndex, 10)] : null;
+        const existingSource = existingRow?._facilityChange || {};
         const rowHtml = (itemIdx) => {
           if (changeType === "interest") {
             return `
-              <div class="change-item-details">
+              <div class="change-item-details" ${changeContextAttributes({ title, note })}>
+                ${changeTitleMarkup({ title })}
                 <span data-date="${date}">${LanguageService.translate("date")}: ${date}</span>
                 <span data-rate="${value}">${LanguageService.translate("rate")}: ${value}%</span>
               </div>
@@ -3380,7 +3618,8 @@ const FormHandler = {
             `;
           }
           return `
-            <div class="change-item-details">
+            <div class="change-item-details" ${changeContextAttributes({ title, note })}>
+              ${changeTitleMarkup({ title })}
               <span data-date="${date}">${LanguageService.translate("date")}: ${date}</span>
               <span data-amount="${value}">${LanguageService.translate("amount")}: ${value}</span>
             </div>
@@ -3399,12 +3638,16 @@ const FormHandler = {
         };
         if (isEdit) {
           const row = listEl.children[parseInt(editIndex, 10)];
-          if (row) row.innerHTML = rowHtml(parseInt(editIndex, 10));
+          if (row) {
+            row.innerHTML = rowHtml(parseInt(editIndex, 10));
+            if (changeType === "loan") row._facilityChange = { ...existingSource, facilityKind: value > 0 ? "part" : "adjustment" };
+          }
           changeForm.removeAttribute("data-edit-change-index");
           changeForm.removeAttribute("data-edit-change-type");
         } else {
           const div = document.createElement("div");
           div.className = "change-item";
+          if (changeType === "loan") div._facilityChange = { facilityKind: value > 0 ? "part" : "adjustment" };
           div.innerHTML = rowHtml(listEl.children.length);
           listEl.appendChild(div);
         }
@@ -3423,6 +3666,8 @@ const FormHandler = {
     const valueLabel = document.getElementById("changeValueLabel");
     const changeDateInput = document.getElementById("changeDate");
     const changeValueInput = document.getElementById("changeValue");
+    const changeTitleInput = document.getElementById("changeTitle");
+    const changeNoteInput = document.getElementById("changeNote");
     if (changeType === "interest") {
       titleEl.textContent = LanguageService.translate("addInterestChange");
       valueLabel.textContent = LanguageService.translate("ratePercentLabel");
@@ -3448,6 +3693,10 @@ const FormHandler = {
         changeForm.setAttribute("data-edit-change-index", String(editOptions.editItemIndex));
         changeForm.setAttribute("data-edit-change-type", "loan");
       }
+    }
+    if (editOptions) {
+      changeTitleInput.value = editOptions.title || "";
+      changeNoteInput.value = editOptions.note || "";
     }
     UIHandler.showModal("add-change-modal");
   },
@@ -3482,7 +3731,7 @@ const FormHandler = {
     if (isSharedEdit && UIHandler.currentShare && UIHandler.currentShare.share) {
       const snapshot = UIHandler.currentShare.share.loan_snapshot;
       loanType = snapshot.loanType === "lend" ? "lend" : "borrow";
-      const newLoan = {
+      let newLoan = LendpileCalculations.buildCanonicalLoanFromEditor(snapshot, {
         id: snapshot.id,
         loanType,
         name: form.querySelector("#loanName").value,
@@ -3492,9 +3741,8 @@ const FormHandler = {
         dayCountConvention,
         currency: form.querySelector("#loanCurrency").value,
         interestChanges: interestChangesCollected,
-        loanChanges: FormHandler.collectLoanChanges(),
-        payments: snapshot.payments || []
-      };
+        loanChanges: FormHandler.collectLoanChanges()
+      });
       const result = await ShareService.updateSharedLoan(UIHandler.currentShare.token, newLoan);
       if (result.error || !result.ok) {
         UIHandler.showFeedback(result.error || LanguageService.translate("changesNotSaved"));
@@ -3507,8 +3755,8 @@ const FormHandler = {
       return;
     }
     const all = StorageService.load("loanData");
-    const newLoan = {
-      id: idx ? all[idx].id : Date.now().toString(36) + Math.random().toString(36).substr(2),
+    const canonicalLoan = LendpileCalculations.buildCanonicalLoanFromEditor(idx !== null ? all[idx] : null, {
+      id: idx !== null ? all[idx].id : Date.now().toString(36) + Math.random().toString(36).substr(2),
       loanType,
       name: form.querySelector("#loanName").value,
       startDate,
@@ -3517,14 +3765,13 @@ const FormHandler = {
       dayCountConvention,
       currency: form.querySelector("#loanCurrency").value,
       interestChanges: interestChangesCollected,
-      loanChanges: FormHandler.collectLoanChanges(),
-      payments: idx ? all[idx].payments : []
-    };
+      loanChanges: FormHandler.collectLoanChanges()
+    });
     if (idx !== null) {
-      all[idx] = newLoan;
+      all[idx] = canonicalLoan;
       UIHandler.showFeedback(LanguageService.translate("loanUpdated"));
     } else {
-      all.push(newLoan);
+      all.push(canonicalLoan);
       UIHandler.showFeedback(LanguageService.translate("loanSaved"));
     }
     StorageService.save("loanData", all);
@@ -3538,7 +3785,13 @@ const FormHandler = {
     document.querySelectorAll("#interest-changes-list .change-item").forEach(div => {
       const d = div.querySelector("[data-date]").getAttribute("data-date");
       const r = parseFloat(div.querySelector("[data-rate]").getAttribute("data-rate"));
-      arr.push({ date: d, rate: r });
+      const details = div.querySelector(".change-item-details");
+      arr.push({
+        date: d,
+        rate: r,
+        title: details?.getAttribute("data-title") || "",
+        note: details?.getAttribute("data-note") || ""
+      });
     });
     return arr.sort((a, b) => new Date(a.date) - new Date(b.date));
   },
@@ -3547,7 +3800,16 @@ const FormHandler = {
     document.querySelectorAll("#loan-changes-list .change-item").forEach(div => {
       const d = div.querySelector("[data-date]").getAttribute("data-date");
       const amt = parseFloat(div.querySelector("[data-amount]").getAttribute("data-amount"));
-      arr.push({ date: d, amount: amt });
+      const details = div.querySelector(".change-item-details");
+      const source = div._facilityChange || {};
+      arr.push({
+        ...source,
+        facilityKind: source.facilityKind || (source.kind === "part" || source.kind === "adjustment" ? source.kind : (amt > 0 ? "part" : "adjustment")),
+        date: d,
+        amount: amt,
+        title: details?.getAttribute("data-title") || "",
+        note: details?.getAttribute("data-note") || ""
+      });
     });
     return arr;
   },
@@ -4681,9 +4943,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (action === "edit" && row && changeType && !isNaN(itemIndex)) {
         const dateEl = row.querySelector("[data-date]");
         const valueEl = row.querySelector("[data-rate], [data-amount]");
+        const details = row.querySelector(".change-item-details");
         const date = dateEl ? dateEl.getAttribute("data-date") : "";
         const value = valueEl ? parseFloat(valueEl.getAttribute("data-rate") || valueEl.getAttribute("data-amount") || "0") : 0;
-        FormHandler.openChangeModal(changeType, { editItemIndex: itemIndex, date, value });
+        const title = details?.getAttribute("data-title") || "";
+        const note = details?.getAttribute("data-note") || "";
+        FormHandler.openChangeModal(changeType, { editItemIndex: itemIndex, date, value, title, note });
       } else if (action === "delete" && changeType) {
         ConfirmHandler.confirmDelete(changeType === "interest" ? "interestChange" : "loanChange", null, null, changeItemMenuItem);
       }
@@ -4723,6 +4988,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else if (index != null && action === "edit") FormHandler.openLoanModal(index);
       else if (index != null && action === "share") UIHandler.openShareModal(index);
       else if (index != null && action === "duplicate") FormHandler.duplicateLoan(index).then(() => UIHandler.showLoanList());
+      else if (index != null && action === "uncombine") CombineLoansHandler.uncombine(index);
       else if (index != null && action === "delete") ConfirmHandler.confirmDelete("loan", index);
       return;
     }
@@ -4760,6 +5026,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const myIndex = item && item._myIndex !== undefined ? item._myIndex : cardIndex;
         if (action === "edit") FormHandler.openLoanModal(myIndex);
         else if (action === "duplicate") FormHandler.duplicateLoan(myIndex).then(() => { UIHandler.showLoanList(); });
+        else if (action === "uncombine") CombineLoansHandler.uncombine(myIndex);
         else if (action === "delete") ConfirmHandler.confirmDelete("loan", myIndex);
       }
       return;
