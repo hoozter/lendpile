@@ -26,8 +26,8 @@ test("secondary application actions live in the main overflow menu", () => {
   assert.doesNotMatch(html, /id="profile-settings"/);
 });
 
-test("combined-loan rendering includes original amounts and loan notes", () => {
-  assert.match(app, /sourceOriginalAmount/);
+test("combined-loan rendering relies on loan-part cards and retains loan notes", () => {
+  assert.doesNotMatch(app, /const combinedOverviewCard/);
   assert.match(app, /loan-notes-card/);
   assert.match(app, /part\.sourceLoanNote/);
 });

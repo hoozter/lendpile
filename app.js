@@ -134,6 +134,7 @@ function positionDropdownInViewport(menu, anchor) {
   menu.style.top = "0px";
   menu.style.maxWidth = `${Math.max(0, window.innerWidth - gap * 2)}px`;
   menu.style.maxHeight = `${Math.max(120, window.innerHeight - gap * 2)}px`;
+  menu.style.overflowX = "hidden";
   menu.style.overflowY = "auto";
   const menuRect = menu.getBoundingClientRect();
   const maxLeft = Math.max(gap, window.innerWidth - menuRect.width - gap);
@@ -421,9 +422,11 @@ const LanguageService = {
       saveNote: 'Spara anteckning',
       noteSaved: 'Anteckningen sparades.',
       noNotes: 'Inga anteckningar ännu.',
-      currentPrincipal: 'Nuvarande kapital',
+      currentPrincipal: 'Återstående kapital',
       accruedInterest: 'Upplupen ränta',
       originalAmount: 'Ursprungligt belopp',
+      originalPrincipal: 'Ursprungligt kapital',
+      originalTotal: 'Ursprungligt totalbelopp',
       beforeCombining: 'Innan du kombinerar',
       combineLoansConfirm: 'Jag förstår att detta skapar en gemensam översikt, inte ett nytt låneavtal eller en refinansiering.',
       combineSelectedLoans: 'Kombinera valda lån',
@@ -848,9 +851,11 @@ const LanguageService = {
       saveNote: 'Save note',
       noteSaved: 'Note saved.',
       noNotes: 'No notes yet.',
-      currentPrincipal: 'Current principal',
+      currentPrincipal: 'Principal remaining',
       accruedInterest: 'Accrued interest',
       originalAmount: 'Original amount',
+      originalPrincipal: 'Original principal',
+      originalTotal: 'Original total',
       beforeCombining: 'Before combining',
       combineLoansConfirm: 'I understand that this creates one overview, not a new loan agreement or refinance.',
       combineSelectedLoans: 'Combine selected loans',
@@ -2305,7 +2310,7 @@ const UIHandler = {
             <span class="loan-part-card-balance">${UIHandler.formatCurrency(partDebt, loan.currency)}</span>
           </div>
           <dl class="loan-part-card-details">
-            <div><dt>${LanguageService.translate("originalAmount")}</dt><dd>${UIHandler.formatCurrency(balance.originalPrincipal ?? part.originalPrincipal, loan.currency)}</dd></div>
+            <div><dt>${LanguageService.translate("originalPrincipal")}</dt><dd>${UIHandler.formatCurrency(balance.originalPrincipal ?? part.originalPrincipal, loan.currency)}</dd></div>
             <div><dt>${LanguageService.translate("currentPrincipal")}</dt><dd>${UIHandler.formatCurrency(principal, loan.currency)}</dd></div>
             <div><dt>${LanguageService.translate("interestRate")}</dt><dd>${rate.toFixed(2)}%</dd></div>
             <div><dt>${LanguageService.translate("accruedInterest")}</dt><dd>${UIHandler.formatCurrency(accruedInterest, loan.currency)}</dd></div>
@@ -2314,19 +2319,7 @@ const UIHandler = {
           ${partNotes.map(note => `<p class="loan-part-card-note">${escapeHtml(note)}</p>`).join("")}
         </article>`;
     }).join("");
-    const combinedSources = loan.combination?.sources || [];
-    const combinedOverviewCard = combinedSources.length > 1 ? `
-      <div class="overview-card">
-        <h4 class="overview-card-title">${LanguageService.translate("combinedFacility")}</h4>
-        <div class="overview-card-content">
-          <p>${LanguageService.translate("combinedFrom")} ${combinedSources.length} ${LanguageService.translate("loan")}.</p>
-          <ul class="combined-source-list">${combinedSources.map(source => {
-            const sourceOriginalAmount = LendpileCalculations.normalizeLoan(source).loanParts
-              .reduce((sum, part) => sum + Number(part.originalPrincipal || 0), 0);
-            return `<li><span>${escapeHtml(source.name || "Loan")}</span><strong>${escapeHtml(LanguageService.translate("originalAmount"))}: ${UIHandler.formatCurrency(sourceOriginalAmount, source.currency || loan.currency)}</strong></li>`;
-          }).join("")}</ul>
-        </div>
-      </div>` : "";
+
     const noteText = String(loan.notes || "").trim();
     const canEditNote = !UIHandler.currentShare || UIHandler.currentShare.share?.permission !== "view";
     const notesCard = `
@@ -2379,7 +2372,6 @@ const UIHandler = {
           </div>
         </div>
         <div class="overview-cards">
-          ${combinedOverviewCard}
           ${notesCard}
           <div class="overview-card">
             <h4 class="overview-card-title">${LanguageService.translate("currentStatus")}</h4>
@@ -2400,7 +2392,7 @@ const UIHandler = {
           <div class="overview-card loan-parts-card">
             <h4 class="overview-card-title">Loan parts</h4>
             <dl class="loan-parts-summary">
-              <div><dt>${LanguageService.translate("originalAmount")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.originalPrincipal, loan.currency)}</dd></div>
+              <div><dt>${LanguageService.translate("originalTotal")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.originalPrincipal, loan.currency)}</dd></div>
               <div><dt>${LanguageService.translate("currentPrincipal")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.currentPrincipal, loan.currency)}</dd></div>
               <div><dt>${LanguageService.translate("accruedInterest")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.accruedInterest, loan.currency)}</dd></div>
               <div><dt>${debtLabel}</dt><dd>${UIHandler.formatCurrency(facilityTotals.currentDebt, loan.currency)}</dd></div>
