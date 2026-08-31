@@ -477,3 +477,44 @@ test("a combined facility can restore exact canonical source records", () => {
   restored[0].name = "changed";
   assert.equal(combined.combination.sources[0].name, "A");
 });
+
+test("loan notes remain separate from the title through canonical editor saves", () => {
+  const saved = C.buildCanonicalLoanFromEditor(null, {
+    id: "with-notes",
+    name: "Kitchen renovation",
+    notes: "Receipts are in the blue folder.",
+    loanType: "borrow",
+    currency: "SEK",
+    startDate: "2026-01-01",
+    initialAmount: 25000,
+    interestRate: 2,
+    dayCountConvention: "actual365",
+    interestChanges: [],
+    loanChanges: []
+  });
+
+  assert.equal(saved.name, "Kitchen renovation");
+  assert.equal(saved.notes, "Receipts are in the blue folder.");
+  assert.equal(C.facilityEditorModel(saved).notes, "Receipts are in the blue folder.");
+});
+
+test("combining loans keeps facility notes separate and restores exact source titles and notes", () => {
+  const sources = [
+    { id: "a", name: "Kitchen", notes: "Invoice 17 remains unpaid.", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365", initialAmount: 100, startDate: "2024-01-01", interestRate: 1, payments: [] },
+    { id: "b", name: "Roof", notes: "", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365", initialAmount: 200, startDate: "2024-02-01", interestRate: 2, payments: [] },
+    { id: "c", name: "Windows", notes: "Warranty expires in 2031.", loanType: "borrow", currency: "SEK", dayCountConvention: "actual365", initialAmount: 300, startDate: "2024-03-01", interestRate: 3, payments: [] }
+  ];
+
+  assert.throws(() => C.combineLoans(sources, { name: "   " }), /title/i);
+  const combined = C.combineLoans(sources, {
+    id: "home",
+    name: "Home improvements",
+    notes: "One place for the renovation financing."
+  });
+  assert.equal(combined.name, "Home improvements");
+  assert.equal(combined.notes, "One place for the renovation financing.");
+  assert.deepEqual(
+    C.uncombineLoan(combined).map(loan => ({ name: loan.name, notes: loan.notes })),
+    sources.map(loan => ({ name: loan.name, notes: loan.notes }))
+  );
+});

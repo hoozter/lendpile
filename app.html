@@ -46,9 +46,7 @@
             <button type="button" class="profile-dropdown-item" id="profile-account" role="menuitem">
               <span class="material-icons">person</span><span data-translate="account">Account</span>
             </button>
-            <button type="button" class="profile-dropdown-item" id="profile-settings" role="menuitem">
-              <span class="material-icons">settings</span><span data-translate="settings">Settings</span>
-            </button>
+
             <a href="admin.html" class="profile-dropdown-item profile-admin-link" id="profile-admin" role="menuitem" style="display: none;">
               <span class="material-icons">admin_panel_settings</span><span data-translate="admin">Admin</span>
             </a>
@@ -86,8 +84,17 @@
         <div class="loan-info-header">
           <h2 data-translate="myLoans">Mina lån</h2>
           <div class="loan-info-actions">
-            <button type="button" class="btn-secondary hidden" id="combine-loans-btn" data-translate="combineLoans">Kombinera lån</button>
             <button class="btn-add" id="add-loan-btn" data-translate="addLoan">Lägg till Lån</button>
+            <div class="main-actions-menu-wrap">
+              <button type="button" id="main-actions-menu-btn" class="main-actions-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="More actions" title="More actions">
+                <span class="material-icons">more_vert</span>
+              </button>
+              <div id="main-actions-menu" class="main-actions-menu dropdown-menu" role="menu">
+                <button type="button" role="menuitem" data-main-action="settings"><span class="material-icons">settings</span><span data-translate="settings">Settings</span></button>
+                <button type="button" role="menuitem" data-main-action="combine"><span class="material-icons">merge_type</span><span data-translate="combineLoans">Combine loans</span></button>
+                <button type="button" role="menuitem" data-main-action="data-management"><span class="material-icons">folder</span><span data-translate="dataManagement">Data management</span></button>
+              </div>
+            </div>
           </div>
         </div>
         <div id="loans-list">
@@ -148,6 +155,12 @@
             <label for="loanName" data-translate="loanName">Lånenamn:</label>
             <div id="loanName-container" class="loan-field-wrap">
               <input type="text" id="loanName" required placeholder="Ex. Bolån" />
+            </div>
+          </div>
+          <div class="form-row form-row-top">
+            <label for="loanNotes" data-translate="loanNotes">Notes (optional):</label>
+            <div class="loan-field-wrap">
+              <textarea id="loanNotes" rows="4" maxlength="4000" data-translate-placeholder="loanNotesPlaceholder" placeholder="Additional information about this loan"></textarea>
             </div>
           </div>
           <div class="form-row">
@@ -586,7 +599,7 @@
         </div>
         <div id="start-page-loans-list" class="start-page-loans-list"></div>
       </div>
-      <div class="modal-section">
+      <div class="modal-section" id="data-management-section" tabindex="-1">
         <h4 class="modal-section-title" data-translate="dataManagement">Datahantering</h4>
         <div class="data-export">
           <h4 class="modal-section-subtitle" data-translate="exportLoans">Exportera lån</h4>
@@ -701,7 +714,9 @@
         </fieldset>
         <div class="combine-name-wrap hidden" id="combine-name-wrap">
           <label for="combine-loan-name" data-translate="combinedLoanName">Name for the combined loan</label>
-          <input type="text" id="combine-loan-name" maxlength="200" autocomplete="off">
+          <input type="text" id="combine-loan-name" maxlength="200" autocomplete="off" required data-translate-placeholder="combinedLoanNamePlaceholder" placeholder="Enter a title">
+          <label for="combine-loan-notes" data-translate="loanNotes">Notes (optional):</label>
+          <textarea id="combine-loan-notes" rows="4" maxlength="4000" data-translate-placeholder="loanNotesPlaceholder" placeholder="Additional information about this loan"></textarea>
         </div>
         <div id="combine-loans-feedback" class="combine-feedback" role="status" aria-live="polite"></div>
         <section id="combine-loans-review" class="combine-review hidden" aria-live="polite">
