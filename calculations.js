@@ -727,7 +727,7 @@
       const partIds = (loan.loanParts || []).map((part, partIndex) => {
         const sourcePartId = String(part.id ?? `part-${partIndex + 1}`);
         const id = `${sourceKey}:${sourcePartId}`;
-        parts.push({ ...cloneData(part), id, sourceLoanId: loan.id ?? sourceKey, sourceLoanName: loan.name || `Loan ${loanIndex + 1}`, sourcePartId });
+        parts.push({ ...cloneData(part), id, sourceLoanId: loan.id ?? sourceKey, sourceLoanName: loan.name || `Loan ${loanIndex + 1}`, sourceLoanNote: loan.notes || "", sourcePartId });
         return id;
       });
       const originalToCombinedPartIds = new Map((loan.loanParts || []).map((part, partIndex) => [

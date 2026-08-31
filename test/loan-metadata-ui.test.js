@@ -5,10 +5,16 @@ import { readFileSync } from "node:fs";
 const html = readFileSync(new URL("../app.html", import.meta.url), "utf8");
 const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
-test("loan editing exposes a separate optional notes field", () => {
-  assert.match(html, /id="loanNotes"/);
-  assert.match(html, /data-translate="loanNotes"/);
-  assert.match(app, /querySelector\("#loanNotes"\)\.value/);
+test("notes are edited independently from loan terms", () => {
+  const loanForm = html.match(/<form id="loan-form-modal">([\s\S]*?)<\/form>/)?.[1] || "";
+  assert.doesNotMatch(loanForm, /loanNotes|loan-note-text/);
+  assert.match(html, /id="loan-note-form"/);
+  assert.match(html, /id="loan-note-text"/);
+  assert.match(app, /const LoanNoteHandler/);
+});
+
+test("generic modal close controls restore page scrolling", () => {
+  assert.match(app, /else UIHandler\.closeModal\(modal\.id\);/);
 });
 
 test("secondary application actions live in the main overflow menu", () => {
@@ -23,6 +29,7 @@ test("secondary application actions live in the main overflow menu", () => {
 test("combined-loan rendering includes original amounts and loan notes", () => {
   assert.match(app, /sourceOriginalAmount/);
   assert.match(app, /loan-notes-card/);
+  assert.match(app, /part\.sourceLoanNote/);
 });
 
 test("combining requires a custom title and accepts separate optional facility notes", () => {

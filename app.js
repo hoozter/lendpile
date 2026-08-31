@@ -123,6 +123,28 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+/** Keep an anchored popup inside the visible viewport, including narrow mobile screens. */
+function positionDropdownInViewport(menu, anchor) {
+  if (!menu || !anchor || !menu.classList.contains("open")) return;
+  const gap = 8;
+  const anchorRect = anchor.getBoundingClientRect();
+  menu.style.position = "fixed";
+  menu.style.right = "auto";
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  menu.style.maxWidth = `${Math.max(0, window.innerWidth - gap * 2)}px`;
+  menu.style.maxHeight = `${Math.max(120, window.innerHeight - gap * 2)}px`;
+  menu.style.overflowY = "auto";
+  const menuRect = menu.getBoundingClientRect();
+  const maxLeft = Math.max(gap, window.innerWidth - menuRect.width - gap);
+  const left = Math.min(Math.max(gap, anchorRect.right - menuRect.width), maxLeft);
+  const below = anchorRect.bottom + 6;
+  const above = anchorRect.top - menuRect.height - 6;
+  const top = below + menuRect.height <= window.innerHeight - gap || above < gap ? below : above;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${Math.max(gap, Math.min(top, window.innerHeight - menuRect.height - gap))}px`;
+}
+
 /** Render persisted context for an interest or principal change safely. */
 function changeContextAttributes(change) {
   return `data-title="${escapeHtml(change?.title || "")}" data-note="${escapeHtml(change?.note || "")}"`;
@@ -392,6 +414,15 @@ const LanguageService = {
       combinedLoanNamePlaceholder: 'Ange en titel',
       loanNotes: 'Anteckningar (valfritt):',
       loanNotesPlaceholder: 'Ytterligare information om lånet',
+      loanNotesTitle: 'Anteckningar',
+      loanNotesHelp: 'Spara sammanhang om lånet utan att ändra lånevillkoren.',
+      editNote: 'Redigera anteckning',
+      addNote: 'Lägg till anteckning',
+      saveNote: 'Spara anteckning',
+      noteSaved: 'Anteckningen sparades.',
+      noNotes: 'Inga anteckningar ännu.',
+      currentPrincipal: 'Nuvarande kapital',
+      accruedInterest: 'Upplupen ränta',
       originalAmount: 'Ursprungligt belopp',
       beforeCombining: 'Innan du kombinerar',
       combineLoansConfirm: 'Jag förstår att detta skapar en gemensam översikt, inte ett nytt låneavtal eller en refinansiering.',
@@ -810,6 +841,15 @@ const LanguageService = {
       combinedLoanNamePlaceholder: 'Enter a title',
       loanNotes: 'Notes (optional):',
       loanNotesPlaceholder: 'Additional information about this loan',
+      loanNotesTitle: 'Notes',
+      loanNotesHelp: 'Keep context about this loan without changing its terms.',
+      editNote: 'Edit note',
+      addNote: 'Add note',
+      saveNote: 'Save note',
+      noteSaved: 'Note saved.',
+      noNotes: 'No notes yet.',
+      currentPrincipal: 'Current principal',
+      accruedInterest: 'Accrued interest',
       originalAmount: 'Original amount',
       beforeCombining: 'Before combining',
       combineLoansConfirm: 'I understand that this creates one overview, not a new loan agreement or refinance.',
@@ -1651,6 +1691,7 @@ const UIHandler = {
       event.stopPropagation();
       const open = mainActionsMenu?.classList.toggle("open") || false;
       mainActionsButton.setAttribute("aria-expanded", String(open));
+      if (open) positionDropdownInViewport(mainActionsMenu, mainActionsButton);
     });
     mainActionsMenu?.addEventListener("click", event => {
       const item = event.target.closest("[data-main-action]");
@@ -1720,6 +1761,8 @@ const UIHandler = {
     document.getElementById("add-loan-btn").addEventListener("click", () => {
       FormHandler.openLoanModal();
     });
+    document.getElementById("loan-note-form")?.addEventListener("submit", event => LoanNoteHandler.save(event));
+    document.getElementById("cancel-loan-note")?.addEventListener("click", () => LoanNoteHandler.close());
     document.getElementById("combine-loan-options")?.addEventListener("change", () => CombineLoansHandler.update());
     document.getElementById("combine-loan-name")?.addEventListener("input", () => CombineLoansHandler.update());
     document.getElementById("combine-loans-confirm")?.addEventListener("change", () => CombineLoansHandler.update());
@@ -1762,7 +1805,7 @@ const UIHandler = {
         if (modal.id === "delete-confirmation-modal") ConfirmHandler.cancelDelete();
         else if (modal.id === "remove-shared-loan-modal") UIHandler.cancelRemoveSharedLoan();
         else if (modal.id === "generic-confirm-modal") UIHandler.cancelGenericConfirm();
-        else modal.style.display = "none";
+        else UIHandler.closeModal(modal.id);
       });
     });
     document.getElementById("cancel-change-btn").addEventListener("click", () => {
@@ -2231,12 +2274,46 @@ const UIHandler = {
           <span class="overview-label">${escapeHtml(UIHandler.formatDate(ch.date))}</span>
           <span class="overview-value">${escapeHtml(String(ch.rate))}%</span>
         </div>`).join("");
-    const loanPartRows = currentParts.map((part, i) => `
-      <div class="overview-row loan-part-row">
-        <span class="overview-label">${escapeHtml(part.label || `Part ${i + 1}`)} · ${escapeHtml(UIHandler.formatDate(part.startDate))} · ${Number(part.interestRate ?? part.rate ?? 0).toFixed(2)}%</span>
-        <span class="overview-value">${UIHandler.formatCurrency(part.originalPrincipal, loan.currency)} → ${UIHandler.formatCurrency(part.balance, loan.currency)}<br><small>Interest: ${UIHandler.formatCurrency(part.accruedInterest || 0, loan.currency)} · Balance: ${UIHandler.formatCurrency(part.currentDebt ?? ((part.balance || 0) + (part.accruedInterest || 0)), loan.currency)}</small></span>
-      </div>`).join("");
-    const facilityTotals = `Original principal: ${UIHandler.formatCurrency(canonicalLoan.loanParts.reduce((sum, part) => sum + Number(part.originalPrincipal || 0), 0), loan.currency)} · Current principal: ${UIHandler.formatCurrency(currentParts.reduce((sum, part) => sum + Number(part.balance || 0), 0), loan.currency)} · Accrued interest: ${UIHandler.formatCurrency(currentParts.reduce((sum, part) => sum + Number(part.accruedInterest || 0), 0), loan.currency)} · Total debt: ${UIHandler.formatCurrency(currentDebt, loan.currency)}`;
+    const canonicalPartsById = new Map(canonicalLoan.loanParts.map(part => [String(part.id), part]));
+    const facilityTotals = currentParts.reduce((totals, balance, i) => {
+      const part = canonicalPartsById.get(String(balance.partId ?? balance.id)) || canonicalLoan.loanParts[i] || {};
+      const originalPrincipal = Number(balance.originalPrincipal ?? part.originalPrincipal ?? 0);
+      const currentPrincipal = Number(balance.balance ?? part.originalPrincipal ?? 0);
+      const accruedInterest = Number(balance.accruedInterest ?? 0);
+      totals.originalPrincipal += originalPrincipal;
+      totals.currentPrincipal += currentPrincipal;
+      totals.accruedInterest += accruedInterest;
+      totals.currentDebt += currentPrincipal + accruedInterest;
+      return totals;
+    }, { originalPrincipal: 0, currentPrincipal: 0, accruedInterest: 0, currentDebt: 0 });
+    const loanPartCards = currentParts.map((balance, i) => {
+      const part = canonicalPartsById.get(String(balance.partId ?? balance.id)) || canonicalLoan.loanParts[i] || {};
+      const title = part.title || part.sourceLoanName || `${LanguageService.translate("loanPart")} ${i + 1}`;
+      const principal = Number(balance.balance ?? part.originalPrincipal ?? 0);
+      const accruedInterest = Number(balance.accruedInterest ?? 0);
+      const partDebt = principal + accruedInterest;
+      const rate = Number(balance.interestRate ?? balance.rate ?? part.interestRate ?? 0);
+      const partNotes = [part.note, part.sourceLoanNote]
+        .filter((note, noteIndex, notes) => note && notes.indexOf(note) === noteIndex);
+      return `
+        <article class="loan-part-card">
+          <div class="loan-part-card-header">
+            <div>
+              <span class="loan-part-card-number">${escapeHtml(LanguageService.translate("loanPart"))} ${i + 1}</span>
+              <h5 class="loan-part-card-title">${escapeHtml(title)}</h5>
+            </div>
+            <span class="loan-part-card-balance">${UIHandler.formatCurrency(partDebt, loan.currency)}</span>
+          </div>
+          <dl class="loan-part-card-details">
+            <div><dt>${LanguageService.translate("originalAmount")}</dt><dd>${UIHandler.formatCurrency(balance.originalPrincipal ?? part.originalPrincipal, loan.currency)}</dd></div>
+            <div><dt>${LanguageService.translate("currentPrincipal")}</dt><dd>${UIHandler.formatCurrency(principal, loan.currency)}</dd></div>
+            <div><dt>${LanguageService.translate("interestRate")}</dt><dd>${rate.toFixed(2)}%</dd></div>
+            <div><dt>${LanguageService.translate("accruedInterest")}</dt><dd>${UIHandler.formatCurrency(accruedInterest, loan.currency)}</dd></div>
+            <div><dt>${LanguageService.translate("startDate")}</dt><dd>${escapeHtml(UIHandler.formatDate(balance.startDate || part.startDate))}</dd></div>
+          </dl>
+          ${partNotes.map(note => `<p class="loan-part-card-note">${escapeHtml(note)}</p>`).join("")}
+        </article>`;
+    }).join("");
     const combinedSources = loan.combination?.sources || [];
     const combinedOverviewCard = combinedSources.length > 1 ? `
       <div class="overview-card">
@@ -2250,11 +2327,16 @@ const UIHandler = {
           }).join("")}</ul>
         </div>
       </div>` : "";
-    const notesCard = String(loan.notes || "").trim() ? `
+    const noteText = String(loan.notes || "").trim();
+    const canEditNote = !UIHandler.currentShare || UIHandler.currentShare.share?.permission !== "view";
+    const notesCard = `
       <div class="overview-card loan-notes-card">
-        <h4 class="overview-card-title">${LanguageService.translate("loanNotes").replace(/:$/, "")}</h4>
-        <div class="overview-card-content"><p>${escapeHtml(loan.notes).replace(/\n/g, "<br>")}</p></div>
-      </div>` : "";
+        <div class="overview-card-heading">
+          <h4 class="overview-card-title">${LanguageService.translate("loanNotesTitle")}</h4>
+          ${canEditNote ? `<button type="button" class="btn-note-edit" data-action="edit-note">${LanguageService.translate(noteText ? "editNote" : "addNote")}</button>` : ""}
+        </div>
+        <div class="overview-card-content loan-note-content ${noteText ? "" : "loan-note-empty"}">${noteText ? escapeHtml(noteText) : LanguageService.translate("noNotes")}</div>
+      </div>`;
     const forecastContent = (!loan.payments || loan.payments.length === 0)
       ? `<div class="overview-row"><span class="overview-label">${LanguageService.translate("noAmortizationPlan")}</span><span class="overview-value">-</span></div>`
       : `
@@ -2315,9 +2397,15 @@ const UIHandler = {
             <h4 class="overview-card-title">${LanguageService.translate("interestChanges")}</h4>
             ${interestRows}
           </div>
-          <div class="overview-card">
+          <div class="overview-card loan-parts-card">
             <h4 class="overview-card-title">Loan parts</h4>
-            <div class="overview-card-content"><p>${facilityTotals}</p>${loanPartRows}</div>
+            <dl class="loan-parts-summary">
+              <div><dt>${LanguageService.translate("originalAmount")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.originalPrincipal, loan.currency)}</dd></div>
+              <div><dt>${LanguageService.translate("currentPrincipal")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.currentPrincipal, loan.currency)}</dd></div>
+              <div><dt>${LanguageService.translate("accruedInterest")}</dt><dd>${UIHandler.formatCurrency(facilityTotals.accruedInterest, loan.currency)}</dd></div>
+              <div><dt>${debtLabel}</dt><dd>${UIHandler.formatCurrency(facilityTotals.currentDebt, loan.currency)}</dd></div>
+            </dl>
+            <div class="loan-parts-grid">${loanPartCards}</div>
           </div>
         </div>
       </div>
@@ -3120,6 +3208,50 @@ const UIHandler = {
   }
 };
 
+const LoanNoteHandler = {
+  getLoan() {
+    if (UIHandler.currentShare?.share?.loan_snapshot) return UIHandler.currentShare.share.loan_snapshot;
+    const loans = StorageService.load("loanData") || [];
+    return UIHandler.currentDetailLoanIndex == null ? null : loans[UIHandler.currentDetailLoanIndex];
+  },
+  open() {
+    const loan = this.getLoan();
+    if (!loan) return;
+    const field = document.getElementById("loan-note-text");
+    field.value = loan.notes || "";
+    UIHandler.showModal("loan-note-modal");
+    requestAnimationFrame(() => field.focus());
+  },
+  close() {
+    UIHandler.closeModal("loan-note-modal");
+  },
+  async save(event) {
+    event.preventDefault();
+    const notes = document.getElementById("loan-note-text").value;
+    if (UIHandler.currentShare?.share?.loan_snapshot) {
+      if (UIHandler.currentShare.share.permission === "view") return;
+      const snapshot = UIHandler.currentShare.share.loan_snapshot;
+      const updated = LendpileCalculations.normalizeLoan({ ...snapshot, notes });
+      const result = await ShareService.updateSharedLoan(UIHandler.currentShare.token, updated);
+      if (result.error || !result.ok) {
+        UIHandler.showFeedback(result.error || LanguageService.translate("changesNotSaved"));
+        return;
+      }
+      UIHandler.currentShare.share.loan_snapshot = updated;
+    } else {
+      const index = UIHandler.currentDetailLoanIndex;
+      const loans = StorageService.load("loanData") || [];
+      if (index == null || !loans[index]) return;
+      loans[index] = LendpileCalculations.normalizeLoan({ ...loans[index], notes });
+      StorageService.save("loanData", loans);
+      if (!sessionStorage.getItem("offlineMode")) await SyncService.syncData();
+    }
+    this.close();
+    UIHandler.renderDetailContent();
+    UIHandler.showFeedback(LanguageService.translate("noteSaved"));
+  }
+};
+
 const CombineLoansHandler = {
   selectedIndexes() {
     return Array.from(document.querySelectorAll("#combine-loan-options input:checked"))
@@ -3258,7 +3390,7 @@ const FormHandler = {
     document.getElementById("add-loan-change-btn").style.display = "";
     const subBtn = form.querySelector('button[type="submit"]');
     if (subBtn) subBtn.style.display = "";
-    ["loanName", "loanNotes", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
+    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = false;
     });
@@ -3282,7 +3414,6 @@ const FormHandler = {
       form.setAttribute("data-edit-mode", "true");
       title.textContent = LanguageService.translate("editLoan");
       form.querySelector("#loanName").value = loan.name;
-      form.querySelector("#loanNotes").value = loan.notes || "";
       form.querySelector("#loanStartDate").value = loan.startDate;
       form.querySelector("#loanInitialAmount").value = loan.initialAmount;
       form.querySelector("#loanCurrency").value = loan.currency;
@@ -3392,7 +3523,7 @@ const FormHandler = {
     document.getElementById("add-loan-change-btn").style.display = "";
     const subBtn = form.querySelector('button[type="submit"]');
     if (subBtn) subBtn.style.display = "";
-    ["loanName", "loanNotes", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
+    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = false;
     });
@@ -3412,7 +3543,6 @@ const FormHandler = {
     if (loanTypeInput) loanTypeInput.value = displayLoanType;
     title.textContent = LanguageService.translate("editLoan");
     form.querySelector("#loanName").value = loan.name || "";
-    form.querySelector("#loanNotes").value = loan.notes || "";
     form.querySelector("#loanStartDate").value = loan.startDate || "";
     form.querySelector("#loanInitialAmount").value = loan.initialAmount ?? "";
     form.querySelector("#loanCurrency").value = loan.currency || "SEK";
@@ -3508,13 +3638,12 @@ const FormHandler = {
     if (loanTypeInput) loanTypeInput.value = displayLoanType;
     title.textContent = LanguageService.translate("editLoan");
     form.querySelector("#loanName").value = loan.name || "";
-    form.querySelector("#loanNotes").value = loan.notes || "";
     form.querySelector("#loanStartDate").value = loan.startDate || "";
     form.querySelector("#loanInitialAmount").value = loan.initialAmount ?? "";
     form.querySelector("#loanCurrency").value = loan.currency || "SEK";
     form.querySelector("#loanDayCountConvention").value = getLoanDayCountConventionForDisplay(loan);
     updateDayCountHelp();
-    ["loanName", "loanNotes", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
+    ["loanName", "loanStartDate", "loanInitialAmount", "loanCurrency", "loanDayCountConvention"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = true;
     });
@@ -3768,7 +3897,7 @@ const FormHandler = {
         id: snapshot.id,
         loanType,
         name: form.querySelector("#loanName").value,
-        notes: form.querySelector("#loanNotes").value,
+        notes: snapshot.notes || "",
         startDate,
         initialAmount: parseFloat(form.querySelector("#loanInitialAmount").value || 0),
         interestRate,
@@ -3793,7 +3922,7 @@ const FormHandler = {
       id: idx !== null ? all[idx].id : Date.now().toString(36) + Math.random().toString(36).substr(2),
       loanType,
       name: form.querySelector("#loanName").value,
-      notes: form.querySelector("#loanNotes").value,
+      notes: idx !== null ? (all[idx].notes || "") : "",
       startDate,
       initialAmount: parseFloat(form.querySelector("#loanInitialAmount").value || 0),
       interestRate,
@@ -4351,6 +4480,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         profileDropdown.classList.toggle("open");
         profileIconBtn.setAttribute("aria-expanded", profileDropdown.classList.contains("open"));
+        positionDropdownInViewport(profileDropdown, profileIconBtn);
       }
     });
     document.addEventListener("click", () => {
@@ -4963,6 +5093,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.querySelectorAll(".change-item-menu.dropdown-menu").forEach(m => m.classList.remove("open"));
       if (menu) menu.classList.toggle("open");
       changeItemMenuBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
+      positionDropdownInViewport(menu, changeItemMenuBtn);
       return;
     }
     const changeItemMenuItem = e.target.closest(".change-item-menu-wrap button[data-action]");
@@ -4992,6 +5123,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   document.querySelector(".container").addEventListener("click", (e) => {
+    const editNoteButton = e.target.closest('[data-action="edit-note"]');
+    if (editNoteButton) {
+      e.stopPropagation();
+      LoanNoteHandler.open();
+      return;
+    }
     const overviewBtn = e.target.closest(".overview-detail-menu-btn");
     if (overviewBtn) {
       e.stopPropagation();
@@ -5000,6 +5137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.querySelectorAll(".overview-detail-menu.dropdown-menu").forEach(m => m.classList.remove("open"));
       if (menu) menu.classList.toggle("open");
       overviewBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
+      positionDropdownInViewport(menu, overviewBtn);
       return;
     }
     const overviewItem = e.target.closest(".overview-detail-menu button[data-action]");
@@ -5035,6 +5173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.querySelectorAll(".loan-detail-menu.open").forEach(m => m.classList.remove("open"));
       if (menu) menu.classList.toggle("open");
       loanCardMenuBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
+      positionDropdownInViewport(menu, loanCardMenuBtn);
       return;
     }
     const loanCardMenuItem = e.target.closest(".loan-detail-menu [data-action]");
@@ -5074,6 +5213,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.querySelectorAll(".payment-plan-menu.dropdown-menu").forEach(m => m.classList.remove("open"));
       if (menu) menu.classList.toggle("open");
       paymentPlanBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
+      positionDropdownInViewport(menu, paymentPlanBtn);
       return;
     }
     const paymentPlanItem = e.target.closest(".payment-plan-menu button[data-action]");

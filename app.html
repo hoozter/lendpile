@@ -157,12 +157,6 @@
               <input type="text" id="loanName" required placeholder="Ex. Bolån" />
             </div>
           </div>
-          <div class="form-row form-row-top">
-            <label for="loanNotes" data-translate="loanNotes">Notes (optional):</label>
-            <div class="loan-field-wrap">
-              <textarea id="loanNotes" rows="4" maxlength="4000" data-translate-placeholder="loanNotesPlaceholder" placeholder="Additional information about this loan"></textarea>
-            </div>
-          </div>
           <div class="form-row">
             <label for="loanStartDate" data-translate="startDate">Startdatum:</label>
             <div id="loanStartDate-container" class="locked-field-container loan-field-wrap">
@@ -229,6 +223,22 @@
             <span class="material-icons">lock</span>
             <span class="lock-text" data-translate="unlockSensitiveFields">Lås upp känsliga fält</span>
           </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notes are related to a loan, but edited independently from its terms. -->
+  <div id="loan-note-modal" class="modal">
+    <div class="modal-content loan-note-modal-content">
+      <span class="btn-close" aria-label="Close">&times;</span>
+      <h2 class="modal-main-title" data-translate="loanNotesTitle">Notes</h2>
+      <form id="loan-note-form">
+        <p class="loan-note-help" data-translate="loanNotesHelp">Keep context about this loan without changing its terms.</p>
+        <textarea id="loan-note-text" rows="8" maxlength="4000" data-translate-placeholder="loanNotesPlaceholder" placeholder="Additional information about this loan"></textarea>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-loan-note" data-translate="cancel">Cancel</button>
+          <button type="submit" class="btn-primary" data-translate="saveNote">Save note</button>
         </div>
       </form>
     </div>

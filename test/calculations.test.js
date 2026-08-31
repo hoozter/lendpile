@@ -514,6 +514,10 @@ test("combining loans keeps facility notes separate and restores exact source ti
   assert.equal(combined.name, "Home improvements");
   assert.equal(combined.notes, "One place for the renovation financing.");
   assert.deepEqual(
+    combined.loanParts.map(part => part.sourceLoanNote),
+    ["Invoice 17 remains unpaid.", "", "Warranty expires in 2031."]
+  );
+  assert.deepEqual(
     C.uncombineLoan(combined).map(loan => ({ name: loan.name, notes: loan.notes })),
     sources.map(loan => ({ name: loan.name, notes: loan.notes }))
   );
