@@ -708,9 +708,11 @@
     const sourceLoans = (Array.isArray(inputs) ? inputs : []).map(normalizeLoan);
     const analysis = analyzeLoanCombination(sourceLoans);
     if (analysis.errors.length) throw new Error(analysis.errors.join(" "));
+    const name = String(options.name || "").trim();
+    if (!name) throw new Error("Choose a title for the combined loan.");
     const first = sourceLoans[0];
     const {
-      id: _sourceId, name: _sourceName, loanParts: _sourceParts,
+      id: _sourceId, name: _sourceName, notes: _sourceNotes, loanParts: _sourceParts,
       principalAdjustments: _sourceAdjustments, payments: _sourcePayments,
       combination: _sourceCombination, facilityKind: _sourceFacilityKind,
       ...sharedFields
@@ -751,10 +753,12 @@
         allocationPolicy: payment.allocationPolicy || "proRata"
       }));
     });
+    const notes = String(options.notes || "").trim();
     return normalizeLoan({
       ...sharedFields,
       id: options.id || `combined-${Date.now()}`,
-      name: String(options.name || sourceLoans.map(loan => loan.name).filter(Boolean).join(" + ") || "Combined loans").trim(),
+      name,
+      notes,
       facilityKind: "combined",
       schemaVersion: 2,
       currency: analysis.currency,
