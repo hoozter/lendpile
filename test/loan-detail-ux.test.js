@@ -54,3 +54,28 @@ test('every detail overflow menu uses the viewport positioning guard', () => {
   assert.match(block('.main-actions-menu'), /max-width:\s*calc\(100vw\s*-\s*16px\)/);
   assert.match(block('.main-actions-menu'), /width:\s*min\(210px,\s*calc\(100vw\s*-\s*16px\)\)/);
 });
+
+test('loan cards make the user-entered name primary and open without a redundant View button', () => {
+  const start = js.indexOf('createLoanCardCompact(loan, index)');
+  const end = js.indexOf('/** Card click', start);
+  const card = js.slice(start, end);
+  assert.match(card, /<h3[^>]*>\$\{escapeHtml\(loan\.name\)\}<\/h3>[\s\S]*?<span class="loan-card-type-badge"/);
+  assert.doesNotMatch(card, /btn-open/);
+  assert.doesNotMatch(card, /openLoan/);
+  assert.match(card, /<button[^>]*class="loan-card-compact-open"[^>]*data-action="open"/);
+  assert.doesNotMatch(card, /class="loan-card-compact"[^>]*role="button"/);
+  assert.doesNotMatch(card, /data-loan-type="\$\{loan\.loanType/);
+  assert.doesNotMatch(card, /data-type="\$\{loan\.loanType/);
+});
+
+test('all custom dropdown menus expose an explicit vertical scrollbar', () => {
+  assert.match(css, /\.dropdown-menu,[\s\S]*?\.profile-dropdown\s*\{[\s\S]*?overflow-y:\s*scroll/);
+  assert.match(css, /\.dropdown-menu,[\s\S]*?\.profile-dropdown\s*\{[\s\S]*?scrollbar-width:\s*auto/);
+  assert.match(css, /select\s*\{[\s\S]*?scrollbar-width:\s*auto/);
+  assert.match(js, /menu\.style\.overflowY\s*=\s*"scroll"/);
+});
+
+test('re-entering the application does not register duplicate menu listeners', () => {
+  assert.match(js, /listenersInitialized:\s*false/);
+  assert.match(js, /initializeEventListeners\(\)\s*\{\s*if \(this\.listenersInitialized\) return;\s*this\.listenersInitialized = true;/);
+});

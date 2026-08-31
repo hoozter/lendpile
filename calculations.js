@@ -553,7 +553,8 @@
         ...part,
         id: part.id || `part-${i + 1}`, originalPrincipal: Math.max(0, numeric(part.originalPrincipal ?? part.amount)),
         startDate: isoDate(part.startDate), interestRate: Math.max(0, numeric(part.interestRate)),
-        compoundInterest: Boolean(part.compoundInterest), interestChanges: Array.isArray(part.interestChanges) ? part.interestChanges : []
+        compoundInterest: Boolean(part.compoundInterest),
+        interestChanges: normalizeInterestChanges(part.interestChanges, part.startDate)
       })), principalAdjustments: Array.isArray(loan.principalAdjustments) ? loan.principalAdjustments : [] };
     }
     const start = isoDate(loan.startDate);
@@ -672,6 +673,59 @@
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
 
+  function normalizeInterestChanges(changes, startDate) {
+    const start = parseDate(startDate);
+    return (Array.isArray(changes) ? changes : []).map(change => {
+      const date = isoDate(change?.date);
+      const rate = Number(change?.rate);
+      if (!date || !Number.isFinite(rate) || rate < 0 || (start && parseDate(date) < start)) {
+        throw new Error("Every rate change needs a valid date on or after the part start date and a non-negative rate.");
+      }
+      const normalized = { ...cloneData(change), date, rate };
+      if (!String(normalized.title || "").trim()) delete normalized.title;
+      else normalized.title = String(normalized.title).trim();
+      if (!String(normalized.note || "").trim()) delete normalized.note;
+      else normalized.note = String(normalized.note).trim();
+      return normalized;
+    }).sort((a, b) => parseDate(a.date) - parseDate(b.date));
+  }
+
+  function updateLoanPart(input, partId, patch = {}) {
+    const loan = normalizeLoan(input || {});
+    const index = loan.loanParts.findIndex(part => String(part.id) === String(partId));
+    if (index < 0) throw new Error("Loan part not found.");
+    const current = loan.loanParts[index];
+    if ((current.refinancedBy || []).length) {
+      throw new Error("A refinanced loan part cannot be edited because its recorded payoff and successor principal must remain consistent.");
+    }
+    const originalPrincipal = patch.originalPrincipal === undefined
+      ? current.originalPrincipal : Number(patch.originalPrincipal);
+    const startDate = patch.startDate === undefined ? current.startDate : isoDate(patch.startDate);
+    const interestRate = patch.interestRate === undefined ? current.interestRate : Number(patch.interestRate);
+    if (!Number.isFinite(originalPrincipal) || originalPrincipal <= 0) throw new Error("Original principal must be greater than zero.");
+    if (!startDate) throw new Error("Choose a valid part start date.");
+    if (!Number.isFinite(interestRate) || interestRate < 0) throw new Error("Interest rate must be zero or greater.");
+    const next = {
+      ...current,
+      ...cloneData(patch),
+      id: current.id,
+      originalPrincipal,
+      startDate,
+      interestRate,
+      compoundInterest: patch.compoundInterest === undefined ? Boolean(current.compoundInterest) : Boolean(patch.compoundInterest),
+      interestChanges: normalizeInterestChanges(patch.interestChanges === undefined ? current.interestChanges : patch.interestChanges, startDate)
+    };
+    const title = String(next.title || "").trim();
+    if (title) next.title = title;
+    else delete next.title;
+    const note = String(next.note || "").trim();
+    if (note) next.note = note;
+    else delete next.note;
+    delete next.sourceLoanNote;
+    const parts = loan.loanParts.map((part, partIndex) => partIndex === index ? next : cloneData(part));
+    return normalizeLoan({ ...loan, loanParts: parts });
+  }
+
   function analyzeLoanCombination(inputs) {
     const sourceLoans = Array.isArray(inputs) ? inputs.filter(Boolean) : [];
     const loans = sourceLoans.map(normalizeLoan);
@@ -692,7 +746,7 @@
         "The selected loans will appear as one overview and forecast instead of separate cards.",
         "Every loan part keeps its original rate, start date, changes, and calculation history; rates are never averaged for accounting.",
         "Existing payment schedules and principal adjustments stay attached to their original loan parts.",
-        "You can separate the facility later, but edits made after combining are discarded when the original records are restored."
+        "You can separate the facility later; current part details and part-targeted history are preserved."
       ],
       sourceCount: loans.length,
       partCount: loans.reduce((sum, loan) => sum + (loan.loanParts || []).length, 0),
@@ -727,7 +781,10 @@
       const partIds = (loan.loanParts || []).map((part, partIndex) => {
         const sourcePartId = String(part.id ?? `part-${partIndex + 1}`);
         const id = `${sourceKey}:${sourcePartId}`;
-        parts.push({ ...cloneData(part), id, sourceLoanId: loan.id ?? sourceKey, sourceLoanName: loan.name || `Loan ${loanIndex + 1}`, sourceLoanNote: loan.notes || "", sourcePartId });
+        const combinedPart = { ...cloneData(part), id, sourceLoanId: loan.id ?? sourceKey, sourceLoanName: loan.name || `Loan ${loanIndex + 1}`, sourcePartId };
+        if (!String(combinedPart.note || "").trim() && String(loan.notes || "").trim()) combinedPart.note = String(loan.notes).trim();
+        delete combinedPart.sourceLoanNote;
+        parts.push(combinedPart);
         return id;
       });
       const originalToCombinedPartIds = new Map((loan.loanParts || []).map((part, partIndex) => [
@@ -777,9 +834,95 @@
   }
 
   function uncombineLoan(input) {
-    const sources = input?.combination?.sources;
+    const combined = normalizeLoan(input || {});
+    combined.payments = (combined.payments || []).map((payment, index) => ({ ...payment, id: payment.id || `combined-payment-${index + 1}` }));
+    combined.principalAdjustments = (combined.principalAdjustments || []).map((adjustment, index) => ({ ...adjustment, id: adjustment.id || `combined-adjustment-${index + 1}` }));
+    const sources = combined.combination?.sources;
     if (!Array.isArray(sources) || sources.length < 2) throw new Error("This facility does not contain restorable source loans.");
-    return cloneData(sources).map(normalizeLoan);
+    const sourceKeys = sources.map((source, index) => String(source.id ?? `source-${index + 1}`));
+    const partSource = new Map(combined.loanParts.map(part => [String(part.id), String(part.sourceLoanId)]));
+    const restored = sources.map((source, sourceIndex) => {
+      const sourceKey = sourceKeys[sourceIndex];
+      const currentParts = combined.loanParts.filter(part => String(part.sourceLoanId) === sourceKey).map(part => {
+        const clean = cloneData(part);
+        clean.id = clean.sourcePartId || clean.id;
+        delete clean.sourceLoanId;
+        delete clean.sourceLoanName;
+        delete clean.sourcePartId;
+        delete clean.sourceLoanNote;
+        return clean;
+      });
+      const base = normalizeLoan(source);
+      const currentName = currentParts.length === 1 ? String(currentParts[0].title || base.name || "").trim() : String(base.name || "");
+      const currentNote = currentParts.length === 1 ? String(currentParts[0].note || "") : String(base.notes || "");
+      const notes = currentNote || Object.prototype.hasOwnProperty.call(base, "notes") ? { notes: currentNote } : {};
+      return normalizeLoan({ ...base, name: currentName, ...notes, loanParts: currentParts, payments: [], principalAdjustments: [] });
+    });
+    const sourceIndexByKey = new Map(sourceKeys.map((key, index) => [key, index]));
+    const localTargets = (targetPartIds, sourceKey) => (targetPartIds || [])
+      .filter(id => partSource.get(String(id)) === sourceKey)
+      .map(id => combined.loanParts.find(part => String(part.id) === String(id))?.sourcePartId || id);
+    const singleSourceFor = targetPartIds => {
+      if (!Array.isArray(targetPartIds) || !targetPartIds.length) return null;
+      const keys = new Set(targetPartIds.map(id => partSource.get(String(id))).filter(Boolean));
+      return keys.size === 1 ? [...keys][0] : null;
+    };
+    const materializedPaymentIds = new Set();
+    for (const payment of combined.payments || []) {
+      const sourceKey = singleSourceFor(payment.targetPartIds);
+      if (sourceKey && sourceIndexByKey.has(sourceKey)) {
+        const clean = cloneData(payment);
+        clean.id = String(clean.id || "payment").replace(`${sourceKey}:`, "");
+        clean.targetPartIds = localTargets(payment.targetPartIds, sourceKey);
+        delete clean.sourceLoanId;
+        restored[sourceIndexByKey.get(sourceKey)].payments.push(clean);
+      } else materializedPaymentIds.add(String(payment.id));
+    }
+    const materializedAdjustmentIds = new Set();
+    for (const adjustment of combined.principalAdjustments || []) {
+      const sourceKey = singleSourceFor(adjustment.targetPartIds);
+      if (sourceKey && sourceIndexByKey.has(sourceKey)) {
+        const clean = cloneData(adjustment);
+        clean.id = String(clean.id || "adjustment").replace(`${sourceKey}:`, "");
+        clean.targetPartIds = localTargets(adjustment.targetPartIds, sourceKey);
+        delete clean.sourceLoanId;
+        restored[sourceIndexByKey.get(sourceKey)].principalAdjustments.push(clean);
+      } else materializedAdjustmentIds.add(String(adjustment.id));
+    }
+    if (materializedPaymentIds.size || materializedAdjustmentIds.size) {
+      for (const row of buildCanonicalTimeline(combined)) {
+        for (const allocation of row.paymentAllocations || []) {
+          if (!materializedPaymentIds.has(String(allocation.paymentId))) continue;
+          for (const partAllocation of allocation.parts || []) {
+            const sourceKey = partSource.get(String(partAllocation.partId));
+            const sourceIndex = sourceIndexByKey.get(sourceKey);
+            const amount = numeric(partAllocation.interest) + numeric(partAllocation.principal);
+            if (sourceIndex == null || amount <= 0) continue;
+            restored[sourceIndex].payments.push({
+              id: `${allocation.paymentId}:${isoDate(allocation.date)}:${sourceKey}`,
+              type: "one-time", amount, startDate: isoDate(allocation.date),
+              targetPartIds: localTargets([partAllocation.partId], sourceKey), allocationPolicy: "proRata",
+              materializedFromPaymentId: allocation.paymentId
+            });
+          }
+        }
+        for (const change of row.changes || []) {
+          if (change.type !== "principalAdjustment" || !materializedAdjustmentIds.has(String(change.adjustmentId))) continue;
+          for (const partAllocation of change.allocations || []) {
+            const sourceKey = partSource.get(String(partAllocation.partId));
+            const sourceIndex = sourceIndexByKey.get(sourceKey);
+            if (sourceIndex == null || numeric(partAllocation.principal) <= 0) continue;
+            restored[sourceIndex].principalAdjustments.push({
+              id: `${change.adjustmentId}:${isoDate(change.date)}:${sourceKey}`,
+              date: isoDate(change.date), amount: -numeric(partAllocation.principal),
+              targetPartIds: localTargets([partAllocation.partId], sourceKey), allocationPolicy: "proRata",
+              materializedFromAdjustmentId: change.adjustmentId
+            });
+          }
+        }
+      }
+    }
+    return restored.map(normalizeLoan);
   }
 
   function isCanonicalLoan(loan) { return Array.isArray(loan && loan.loanParts); }
@@ -836,8 +979,8 @@
       const accrue = date => { const days = thirty360 ? days360US(cursor, date) : daysBetween(cursor,date);
         if(days) states.forEach(s=>{ if(s.active && s.balance>0) { const value=s.balance*(partRate(s.part,cursor)/100)*days/denominator; s.accrued+=value; s.monthInterest+=value; interest+=value; }}); cursor=new Date(date); };
       for (const e of events) { accrue(e.date); if(e.type === "draw") { e.state.active=true; e.state.balance=e.state.part.originalPrincipal; changes.push({type:"loanPart",partId:e.state.part.id,value:e.state.balance,date:new Date(e.date)}); }
-        else if(e.type === "adjustment") { const applied=allocateProRata(states, -e.value, e.source.targetPartIds); amortization += applied.reduce((x,a)=>x+a.principal,0); changes.push({type:"principalAdjustment",value:e.value,date:new Date(e.date),allocations:applied}); }
-        else if(e.type === "payment") { const interestParts=allocateAccruedInterest(states,e.value,e.payment.targetPartIds); const interestPaid=interestParts.reduce((sum,part)=>sum+part.interest,0); const principalParts=allocateProRata(states,e.value-interestPaid,e.payment.targetPartIds); const principal=principalParts.reduce((sum,part)=>sum+part.principal,0); const actual=interestPaid+principal; amortization+=principal; payment+=actual; allocations.push({date:new Date(e.date), policy:e.payment.allocationPolicy || "proRata", amount:actual, plannedAmount:e.value, targetPartIds:e.payment.targetPartIds || null, parts:mergePartAllocations(interestParts,principalParts)}); }
+        else if(e.type === "adjustment") { const applied=allocateProRata(states, -e.value, e.source.targetPartIds); amortization += applied.reduce((x,a)=>x+a.principal,0); changes.push({type:"principalAdjustment",adjustmentId:e.source.id || null,value:e.value,date:new Date(e.date),allocations:applied}); }
+        else if(e.type === "payment") { const interestParts=allocateAccruedInterest(states,e.value,e.payment.targetPartIds); const interestPaid=interestParts.reduce((sum,part)=>sum+part.interest,0); const principalParts=allocateProRata(states,e.value-interestPaid,e.payment.targetPartIds); const principal=principalParts.reduce((sum,part)=>sum+part.principal,0); const actual=interestPaid+principal; amortization+=principal; payment+=actual; allocations.push({paymentId:e.payment.id || null,date:new Date(e.date), policy:e.payment.allocationPolicy || "proRata", amount:actual, plannedAmount:e.value, targetPartIds:e.payment.targetPartIds || null, parts:mergePartAllocations(interestParts,principalParts)}); }
       }
       accrue(periodEnd);
       // Non-compounding interest remains a separate liability. Only parts that
@@ -855,6 +998,111 @@
   }
   function buildTimelineAdvanced(loan, options = {}) { return isCanonicalLoan(loan) ? buildCanonicalTimeline(loan, options) : buildTimelineAdvancedLegacy(loan, options); }
   function buildTimeline(loan, options = {}) { return isCanonicalLoan(loan) ? buildCanonicalTimeline(loan, options) : buildTimelineLegacy(loan, options); }
+
+  function debtAtEffectiveDate(input, effectiveDate, targetPartIds) {
+    const loan = normalizeLoan(input || {});
+    const date = isoDate(effectiveDate);
+    if (!date) throw new Error("Choose a valid effective date.");
+    const selectedIds = Array.isArray(targetPartIds) && targetPartIds.length
+      ? [...new Set(targetPartIds.map(String))]
+      : loan.loanParts.map(part => String(part.id));
+    const knownIds = new Set(loan.loanParts.map(part => String(part.id)));
+    if (!selectedIds.length || selectedIds.some(id => !knownIds.has(id))) throw new Error("A selected loan part could not be found.");
+    const latestStart = selectedIds.reduce((latest, id) => {
+      const start = parseDate(loan.loanParts.find(part => String(part.id) === id).startDate);
+      return !latest || start > latest ? start : latest;
+    }, null);
+    if (!latestStart || parseDate(date) < latestStart) throw new Error("The effective date cannot be before a selected loan part starts.");
+    const probeId = `__debt-probe__:${date}:${selectedIds.join(",")}`;
+    const probe = {
+      id: probeId, type: "one-time", amount: Number.MAX_SAFE_INTEGER,
+      startDate: date, targetPartIds: selectedIds, allocationPolicy: "proRata"
+    };
+    const timeline = buildCanonicalTimeline({ ...loan, payments: [...(loan.payments || []), probe] });
+    const allocation = timeline.flatMap(row => row.paymentAllocations || []).find(item => item.paymentId === probeId);
+    const parts = selectedIds.map(partId => {
+      const item = allocation?.parts?.find(part => String(part.partId) === partId);
+      const principal = numeric(item?.principal);
+      const interest = numeric(item?.interest);
+      return { partId, principal, interest, total: principal + interest };
+    });
+    return { date, total: parts.reduce((sum, part) => sum + part.total, 0), parts };
+  }
+
+  function createRefinancing(inputs, selections, terms = {}) {
+    const loans = (Array.isArray(inputs) ? inputs : []).map(normalizeLoan);
+    const effectiveDate = isoDate(terms.effectiveDate);
+    const name = String(terms.name || "").trim();
+    const successorId = String(terms.id || "").trim();
+    const transactionId = String(terms.transactionId || "").trim();
+    const interestRate = Number(terms.interestRate);
+    if (!effectiveDate) throw new Error("Choose a valid effective date.");
+    if (!name) throw new Error("Choose a title for the refinanced loan.");
+    if (!successorId || loans.some(loan => String(loan.id) === successorId)) throw new Error("The successor loan needs a unique stable ID.");
+    if (!transactionId) throw new Error("The refinancing needs a stable transaction ID.");
+    if (!Number.isFinite(interestRate) || interestRate < 0) throw new Error("Interest rate must be zero or greater.");
+    if (!Array.isArray(selections) || !selections.length) throw new Error("Select at least one loan or loan part to refinance.");
+    const byId = new Map(loans.map((loan, index) => [String(loan.id), { loan, index }]));
+    const normalizedSelections = [];
+    const seenParts = new Set();
+    for (const selection of selections) {
+      const entry = byId.get(String(selection?.loanId));
+      if (!entry) throw new Error("A selected source loan could not be found.");
+      const allPartIds = entry.loan.loanParts.map(part => String(part.id));
+      const partIds = Array.isArray(selection.partIds) && selection.partIds.length
+        ? [...new Set(selection.partIds.map(String))] : allPartIds;
+      if (partIds.some(id => !allPartIds.includes(id))) throw new Error("A selected loan part could not be found.");
+      for (const partId of partIds) {
+        const selectionKey = `${entry.loan.id}:${partId}`;
+        if (seenParts.has(selectionKey)) throw new Error("The same obligation cannot be selected twice.");
+        seenParts.add(selectionKey);
+        const part = entry.loan.loanParts.find(item => String(item.id) === partId);
+        if ((part.refinancedBy || []).length) throw new Error("A selected loan part is already refinanced.");
+      }
+      normalizedSelections.push({ ...entry, partIds });
+    }
+    const currencies = new Set(normalizedSelections.map(item => item.loan.currency || "SEK"));
+    const directions = new Set(normalizedSelections.map(item => item.loan.loanType || "borrow"));
+    if (currencies.size !== 1) throw new Error("Selected obligations must use the same currency.");
+    if (directions.size !== 1) throw new Error("Selected obligations must all be borrowing or all be lending.");
+    const payoffRecords = normalizedSelections.map(item => {
+      const debt = debtAtEffectiveDate(item.loan, effectiveDate, item.partIds);
+      if (!(debt.total > 0.000001)) throw new Error("Every selected obligation must have positive debt on the effective date.");
+      return { loanId: item.loan.id, loanName: item.loan.name || "", partIds: item.partIds, amount: debt.total, parts: debt.parts };
+    });
+    const total = payoffRecords.reduce((sum, record) => sum + record.amount, 0);
+    const traceBase = { transactionId, successorLoanId: successorId, effectiveDate };
+    const updated = loans.map(cloneData);
+    normalizedSelections.forEach((selection, selectionIndex) => {
+      const record = payoffRecords[selectionIndex];
+      const source = updated[selection.index];
+      const payoffId = `${transactionId}:payoff:${source.id}`;
+      source.payments = [...(source.payments || []), {
+        id: payoffId, type: "one-time", amount: record.amount, startDate: effectiveDate,
+        targetPartIds: [...selection.partIds], allocationPolicy: "proRata",
+        title: "Refinancing payoff", refinancing: { ...traceBase, amount: record.amount }
+      }];
+      source.refinancingOut = [...(source.refinancingOut || []), { ...traceBase, amount: record.amount, partIds: [...selection.partIds], payoffPaymentId: payoffId }];
+      source.loanParts = source.loanParts.map(part => selection.partIds.includes(String(part.id))
+        ? { ...part, refinancedBy: [...(part.refinancedBy || []), { ...traceBase, amount: record.parts.find(item => item.partId === String(part.id))?.total || 0 }] }
+        : part);
+    });
+    const currency = [...currencies][0];
+    const loanType = [...directions][0];
+    const successor = normalizeLoan({
+      id: successorId, name, notes: String(terms.notes || "").trim(), currency, loanType,
+      dayCountConvention: terms.dayCountConvention || normalizedSelections[0].loan.dayCountConvention,
+      facilityKind: "refinanced", schemaVersion: 2,
+      loanParts: [{ id: `${successorId}:part-1`, originalPrincipal: total, startDate: effectiveDate, interestRate, compoundInterest: Boolean(terms.compoundInterest), interestChanges: [] }],
+      principalAdjustments: [], payments: [],
+      refinancing: {
+        version: 1, transactionId, effectiveDate,
+        sources: payoffRecords.map(record => ({ loanId: record.loanId, loanName: record.loanName, partIds: [...record.partIds], amount: record.amount }))
+      }
+    });
+    updated.push(successor);
+    return { loans: updated, successor, payoffRecords, total };
+  }
 
   function calculatePaymentForTargetDate(loan, targetDateStr, options = {}) {
     if (isCanonicalLoan(loan)) {
@@ -944,6 +1192,9 @@
     analyzeLoanCombination,
     combineLoans,
     uncombineLoan,
+    updateLoanPart,
+    debtAtEffectiveDate,
+    createRefinancing,
     calculatePaymentForTargetDate,
     calculatePaymentForTargetDateAdvanced,
     getLastWeekdayOfMonth,

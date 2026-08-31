@@ -514,11 +514,110 @@ test("combining loans keeps facility notes separate and restores exact source ti
   assert.equal(combined.name, "Home improvements");
   assert.equal(combined.notes, "One place for the renovation financing.");
   assert.deepEqual(
-    combined.loanParts.map(part => part.sourceLoanNote),
+    combined.loanParts.map(part => part.note || ""),
     ["Invoice 17 remains unpaid.", "", "Warranty expires in 2031."]
   );
   assert.deepEqual(
     C.uncombineLoan(combined).map(loan => ({ name: loan.name, notes: loan.notes })),
     sources.map(loan => ({ name: loan.name, notes: loan.notes }))
   );
+});
+
+test("combined parts update immutably and blank notes are removed", () => {
+  const loan = C.combineLoans([
+    { id: "a", name: "A", notes: "old", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 1000, interestRate: 4 },
+    { id: "b", name: "B", currency: "SEK", loanType: "borrow", startDate: "2025-02-01", initialAmount: 2000, interestRate: 5 }
+  ], { id: "combined", name: "Together" });
+  const before = structuredClone(loan);
+  const updated = C.updateLoanPart(loan, "a:part-1", {
+    title: "Edited A", originalPrincipal: 1250, startDate: "2024-12-15",
+    interestRate: 3.25, compoundInterest: true, note: "   ",
+    interestChanges: [{ date: "2025-06-01", rate: 3.75, title: "Review" }]
+  });
+
+  assert.deepEqual(loan, before);
+  assert.equal(updated.loanParts[0].title, "Edited A");
+  assert.equal(updated.loanParts[0].originalPrincipal, 1250);
+  assert.equal(updated.loanParts[0].compoundInterest, true);
+  assert.equal("note" in updated.loanParts[0], false);
+  assert.deepEqual(updated.loanParts[0].interestChanges, [{ date: "2025-06-01", rate: 3.75, title: "Review" }]);
+  assert.deepEqual(updated.loanParts[1], loan.loanParts[1]);
+  assert.throws(() => C.updateLoanPart(loan, "missing", {}), /part/i);
+  assert.throws(() => C.updateLoanPart(loan, "a:part-1", { originalPrincipal: 0 }), /principal/i);
+});
+
+test("uncombine reconstructs current edited parts and scoped post-combination events without leakage", () => {
+  const combined = C.combineLoans([
+    { id: "a", name: "A", notes: "old A", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 1000, interestRate: 4, payments: [] },
+    { id: "b", name: "B", notes: "old B", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 2000, interestRate: 5, payments: [] }
+  ], { id: "combined", name: "Together" });
+  const edited = C.updateLoanPart(combined, "a:part-1", {
+    title: "Current A", note: "current note", originalPrincipal: 1100,
+    interestChanges: [{ date: "2025-03-01", rate: 6 }]
+  });
+  edited.payments.push({ id: "after-pay", type: "one-time", amount: 100, startDate: "2025-04-01", targetPartIds: ["a:part-1"] });
+  edited.principalAdjustments.push({ id: "after-adjust", amount: -50, date: "2025-05-01", targetPartIds: ["b:part-1"] });
+
+  const [a, b] = C.uncombineLoan(edited);
+  assert.equal(a.name, "Current A");
+  assert.deepEqual({ title: a.loanParts[0].title, note: a.loanParts[0].note, originalPrincipal: a.loanParts[0].originalPrincipal },
+    { title: "Current A", note: "current note", originalPrincipal: 1100 });
+  assert.deepEqual(a.loanParts[0].interestChanges, [{ date: "2025-03-01", rate: 6 }]);
+  assert.deepEqual(a.payments.map(event => event.id), ["after-pay"]);
+  assert.deepEqual(b.payments, []);
+  assert.deepEqual(b.principalAdjustments.map(event => event.id), ["after-adjust"]);
+  assert.deepEqual(a.principalAdjustments, []);
+});
+
+test("uncombine materializes an untargeted combined payment into exact source allocations", () => {
+  const combined = C.combineLoans([
+    { id: "a", name: "A", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 1000, interestRate: 0, payments: [] },
+    { id: "b", name: "B", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 3000, interestRate: 0, payments: [] }
+  ], { id: "combined", name: "Together" });
+  combined.payments.push({ id: "shared-payment", type: "one-time", amount: 1000, startDate: "2025-02-01" });
+  const before = C.debtAtEffectiveDate(combined, "2025-02-02").total;
+  const restored = C.uncombineLoan(combined);
+  const after = restored.reduce((sum, loan) => sum + C.debtAtEffectiveDate(loan, "2025-02-02").total, 0);
+  approx(after, before, 0.000001);
+  assert.deepEqual(restored.map(loan => loan.payments[0].amount), [250, 750]);
+  assert.deepEqual(restored.map(loan => loan.payments[0].targetPartIds), [["part-1"], ["part-1"]]);
+});
+
+test("refinancing uses exact canonical debt, targets selected parts, and writes reciprocal trace metadata", () => {
+  const whole = C.normalizeLoan({ id: "whole", name: "Whole", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 1000, interestRate: 12, payments: [] });
+  const combined = C.combineLoans([
+    { id: "a", name: "A", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 2000, interestRate: 0, payments: [] },
+    { id: "b", name: "B", currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 3000, interestRate: 0, payments: [] }
+  ], { id: "combined", name: "Together" });
+
+  const result = C.createRefinancing([whole, combined], [
+    { loanId: "whole" },
+    { loanId: "combined", partIds: ["a:part-1"] }
+  ], {
+    id: "successor", transactionId: "refi-1", effectiveDate: "2025-02-01",
+    name: "New loan", interestRate: 2, compoundInterest: false, notes: "Trace me"
+  });
+  const exactWhole = C.debtAtEffectiveDate(whole, "2025-02-01").total;
+  approx(result.successor.loanParts[0].originalPrincipal, exactWhole + 2000, 0.000001);
+  assert.equal(result.successor.refinancing.transactionId, "refi-1");
+  assert.deepEqual(result.successor.refinancing.sources.map(source => source.loanId), ["whole", "combined"]);
+  const updatedWhole = result.loans.find(loan => loan.id === "whole");
+  const updatedCombined = result.loans.find(loan => loan.id === "combined");
+  assert.equal(updatedWhole.payments.at(-1).refinancing.transactionId, "refi-1");
+  assert.deepEqual(updatedCombined.payments.at(-1).targetPartIds, ["a:part-1"]);
+  assert.ok(C.debtAtEffectiveDate(updatedCombined, "2025-02-02", ["b:part-1"]).total > 2999);
+  approx(C.debtAtEffectiveDate(updatedCombined, "2025-02-02", ["a:part-1"]).total, 0, 0.000001);
+  assert.throws(
+    () => C.updateLoanPart(updatedCombined, "a:part-1", { originalPrincipal: 2500 }),
+    /refinanced.*cannot be edited/i
+  );
+  assert.throws(() => C.createRefinancing(result.loans, [{ loanId: "combined", partIds: ["a:part-1"] }], { id: "again", transactionId: "refi-2", effectiveDate: "2025-03-01", name: "Again", interestRate: 1 }), /already refinanced/i);
+});
+
+test("refinancing validates dates, currency, direction, identity, and positive selected debt", () => {
+  const base = { currency: "SEK", loanType: "borrow", startDate: "2025-01-01", initialAmount: 1000, interestRate: 0, payments: [] };
+  assert.throws(() => C.createRefinancing([{ ...base, id: "a" }, { ...base, id: "b", currency: "EUR" }], [{ loanId: "a" }, { loanId: "b" }], { id: "new", transactionId: "r", effectiveDate: "2025-02-01", name: "New", interestRate: 1 }), /currency/i);
+  assert.throws(() => C.createRefinancing([{ ...base, id: "a" }, { ...base, id: "b", loanType: "lend" }], [{ loanId: "a" }, { loanId: "b" }], { id: "new", transactionId: "r", effectiveDate: "2025-02-01", name: "New", interestRate: 1 }), /borrowing.*lending/i);
+  assert.throws(() => C.createRefinancing([{ ...base, id: "a" }], [{ loanId: "a" }], { id: "a", transactionId: "r", effectiveDate: "2025-02-01", name: "New", interestRate: 1 }), /unique/i);
+  assert.throws(() => C.createRefinancing([{ ...base, id: "a" }], [{ loanId: "a" }], { id: "new", transactionId: "r", effectiveDate: "2024-12-01", name: "New", interestRate: 1 }), /date/i);
 });

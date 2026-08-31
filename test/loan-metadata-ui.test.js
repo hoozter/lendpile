@@ -29,7 +29,7 @@ test("secondary application actions live in the main overflow menu", () => {
 test("combined-loan rendering relies on loan-part cards and retains loan notes", () => {
   assert.doesNotMatch(app, /const combinedOverviewCard/);
   assert.match(app, /loan-notes-card/);
-  assert.match(app, /part\.sourceLoanNote/);
+  assert.match(app, /part\.note/);
 });
 
 test("combining requires a custom title and accepts separate optional facility notes", () => {

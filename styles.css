@@ -888,6 +888,21 @@ th, td {
   background-color: var(--input-background);
   border-color: var(--primary-color);
 }
+.loan-card-compact-open {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.loan-card-compact-open:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 4px;
+}
 .loan-card-compact-info { flex: 1; min-width: 0; }
 .loan-card-type-badge {
   display: inline-block;
@@ -1095,6 +1110,12 @@ th, td {
   background: var(--input-background);
 }
 .loan-part-card-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.loan-part-card-actions { display: flex; align-items: center; gap: 6px; }
+.loan-part-menu-wrap { position: relative; flex: 0 0 auto; }
+.loan-part-menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; color: var(--text-color); background: transparent; cursor: pointer; }
+.loan-part-menu-btn:hover, .loan-part-menu-btn:focus-visible { background: color-mix(in srgb, var(--primary-color) 12%, transparent); outline: none; }
+.loan-part-menu { right: 0; top: 36px; min-width: 170px; }
+.loan-part-menu.open { display: block; }
 .loan-part-card-title { margin: 0; color: var(--text-color); font-size: 1rem; overflow-wrap: anywhere; }
 .loan-part-card-number { display: block; margin-bottom: 2px; color: var(--placeholder-color); font-size: 0.72rem; font-weight: 500; text-transform: uppercase; }
 .loan-part-card-balance { flex: 0 0 auto; color: var(--primary-color); font-size: 1rem; font-weight: 700; white-space: nowrap; }
@@ -1103,6 +1124,21 @@ th, td {
 .loan-part-card-details dt { color: var(--placeholder-color); font-size: 0.72rem; }
 .loan-part-card-details dd { margin: 1px 0 0; font-size: 0.86rem; overflow-wrap: anywhere; }
 .loan-part-card-note { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--input-border); color: var(--placeholder-color); font-size: 0.84rem; white-space: pre-wrap; }
+.obligation-modal-content { width: min(680px, calc(100vw - 24px)); max-height: min(90vh, 850px); overflow-y: auto; }
+.form-grid-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.part-compound-label { align-self: end; min-height: 44px; }
+.modal-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 8px; }
+.modal-section-heading h3 { margin: 0; font-size: 1rem; }
+.part-rate-row { display: grid; grid-template-columns: 1fr 0.75fr 1.2fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+.part-rate-row input { min-width: 0; }
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: 50%; color: var(--button-delete); background: transparent; cursor: pointer; }
+.refinance-loan-group + .refinance-loan-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--input-border); }
+.refinance-part-option { margin-left: 24px; }
+.refinance-payoff-list { margin: 0; padding: 0; list-style: none; }
+.refinance-payoff-list li, .refinance-total { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
+.refinance-total { margin-top: 6px; border-top: 1px solid var(--input-border); font-weight: 700; }
+.loan-loading-state, .loan-load-error { padding: 28px 16px; text-align: center; color: var(--placeholder-color); }
+.loan-load-error .btn-primary { margin-top: 10px; }
 .overview-row {
   display: flex;
   justify-content: space-between;
@@ -1581,6 +1617,8 @@ th, td {
   .overview-detail-menu.dropdown-menu,
   .loan-detail-menu { max-width: calc(100vw - 24px); }
   .loan-part-card-details { grid-template-columns: 1fr; }
+  .form-grid-two, .part-rate-row { grid-template-columns: 1fr; }
+  .part-rate-row .btn-icon { justify-self: end; }
   .loan-detail-tabs {
     flex-wrap: wrap;
     gap: 8px;
@@ -1941,6 +1979,22 @@ th, td {
 }
 .profile-dropdown-item.profile-admin-link:hover {
   color: var(--text-color);
+}
+
+/* Keep overflow controls keyboard- and pointer-accessible even when the
+   platform normally hides overlay scrollbars. */
+.dropdown-menu,
+.loan-detail-menu,
+.main-actions-menu,
+.profile-dropdown {
+  max-height: calc(100vh - 16px);
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-width: auto;
+}
+
+select {
+  scrollbar-width: auto;
 }
 /* Change password modal */
 #change-password-modal .modal-content {

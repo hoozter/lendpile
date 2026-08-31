@@ -92,13 +92,14 @@
               <div id="main-actions-menu" class="main-actions-menu dropdown-menu" role="menu">
                 <button type="button" role="menuitem" data-main-action="settings"><span class="material-icons">settings</span><span data-translate="settings">Settings</span></button>
                 <button type="button" role="menuitem" data-main-action="combine"><span class="material-icons">merge_type</span><span data-translate="combineLoans">Combine loans</span></button>
+                <button type="button" role="menuitem" data-main-action="refinance"><span class="material-icons">account_balance</span><span data-translate="refinanceLoans">Refinance loans</span></button>
                 <button type="button" role="menuitem" data-main-action="data-management"><span class="material-icons">folder</span><span data-translate="dataManagement">Data management</span></button>
               </div>
             </div>
           </div>
         </div>
         <div id="loans-list">
-          <p data-translate="noLoans">Inga lån registrerade. Lägg till ett nytt lån ovan.</p>
+          <p data-translate="loadingLoans" role="status">Laddar dina lån…</p>
         </div>
       </section>
     </div>
@@ -742,6 +743,51 @@
           <button type="button" class="btn-secondary" id="cancel-combine-loans-btn" data-translate="cancel">Cancel</button>
           <button type="submit" class="btn-primary" id="confirm-combine-loans-btn" disabled data-translate="combineSelectedLoans">Combine selected loans</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- LOAN PART EDITOR -->
+  <div id="loan-part-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="loan-part-modal-title">
+    <div class="modal-content obligation-modal-content">
+      <h2 id="loan-part-modal-title" data-translate="editLoanPart">Edit loan part</h2>
+      <form id="loan-part-form">
+        <div class="form-group"><label for="loan-part-title" data-translate="partTitle">Part title</label><input id="loan-part-title" type="text" maxlength="200" required></div>
+        <div class="form-grid-two">
+          <div class="form-group"><label for="loan-part-principal" data-translate="originalPrincipal">Original principal</label><input id="loan-part-principal" type="number" min="0.01" step="0.01" required></div>
+          <div class="form-group"><label for="loan-part-start-date" data-translate="startDate">Start date</label><input id="loan-part-start-date" type="date" required></div>
+          <div class="form-group"><label for="loan-part-interest-rate" data-translate="baseInterestRate">Base interest rate</label><input id="loan-part-interest-rate" type="number" min="0" step="0.01" required></div>
+          <label class="checkbox-label part-compound-label"><input id="loan-part-compound" type="checkbox"><span data-translate="compoundInterest">Compound interest</span></label>
+        </div>
+        <div class="form-group"><label for="loan-part-note" data-translate="loanNotes">Notes (optional)</label><textarea id="loan-part-note" rows="3" maxlength="4000"></textarea></div>
+        <section class="part-rate-section" aria-labelledby="part-rate-heading">
+          <div class="modal-section-heading"><h3 id="part-rate-heading" data-translate="partRateHistory">Part-specific rate history</h3><button type="button" class="btn-add compact" id="add-loan-part-rate-btn" data-translate="addRateChange">Add rate change</button></div>
+          <div id="loan-part-rate-changes"></div>
+        </section>
+        <div id="loan-part-feedback" class="combine-feedback" role="alert" aria-live="assertive"></div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="cancel-loan-part-btn" data-translate="cancel">Cancel</button><button type="submit" class="btn-primary" data-translate="saveChanges">Save changes</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- REFINANCING -->
+  <div id="refinance-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="refinance-modal-title">
+    <div class="modal-content obligation-modal-content">
+      <h2 id="refinance-modal-title" data-translate="refinanceLoans">Refinance loans</h2>
+      <p data-translate="refinanceIntro">Select whole loans or individual parts. Exact debt on the effective date becomes the new principal.</p>
+      <form id="refinance-form">
+        <fieldset class="combine-loan-fieldset"><legend data-translate="chooseObligations">Choose obligations</legend><div id="refinance-options" class="combine-loan-options"></div></fieldset>
+        <div class="form-grid-two">
+          <div class="form-group"><label for="refinance-effective-date" data-translate="effectiveDate">Effective date</label><input id="refinance-effective-date" type="date" required></div>
+          <div class="form-group"><label for="refinance-title" data-translate="successorTitle">New loan title</label><input id="refinance-title" type="text" maxlength="200" required></div>
+          <div class="form-group"><label for="refinance-rate" data-translate="interestRate">Interest rate</label><input id="refinance-rate" type="number" min="0" step="0.01" required></div>
+          <label class="checkbox-label part-compound-label"><input id="refinance-compound" type="checkbox"><span data-translate="compoundInterest">Compound interest</span></label>
+        </div>
+        <div class="form-group"><label for="refinance-note" data-translate="loanNotes">Notes (optional)</label><textarea id="refinance-note" rows="3" maxlength="4000"></textarea></div>
+        <section id="refinance-payoff-review" class="combine-review hidden" aria-live="polite"></section>
+        <div id="refinance-feedback" class="combine-feedback" role="alert" aria-live="assertive"></div>
+        <label class="combine-confirm-row"><input type="checkbox" id="refinance-confirm"><span data-translate="refinanceConfirm">I confirm these exact obligations will be paid off and replaced by the new loan.</span></label>
+        <div class="modal-actions"><button type="button" class="btn-secondary" id="cancel-refinance-btn" data-translate="cancel">Cancel</button><button type="submit" class="btn-primary" id="confirm-refinance-btn" disabled data-translate="createRefinancing">Create refinancing</button></div>
       </form>
     </div>
   </div>
