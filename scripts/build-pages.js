@@ -15,6 +15,7 @@ const outDir = join(root, 'dist');
 const productionApiUrl = 'https://api.lendpile.com';
 
 export const publicFiles = [
+  'THIRD_PARTY_NOTICES.html',
   'index.html',
   'app.html',
   'admin.html',
