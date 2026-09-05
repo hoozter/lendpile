@@ -49,8 +49,7 @@ test('loan parts are first-class readable cards in the overview', () => {
 });
 
 test('every detail overflow menu uses the viewport positioning guard', () => {
-  assert.match(js, /positionDropdownInViewport\(menu, changeItemMenuBtn\)/);
-  assert.match(js, /positionDropdownInViewport\(menu, paymentPlanBtn\)/);
+  assert.match(js, /function toggleDropdownMenu\(menu, trigger\)[\s\S]*?positionDropdownInViewport\(menu, trigger\)/);
   assert.match(block('.main-actions-menu'), /max-width:\s*calc\(100vw\s*-\s*16px\)/);
   assert.match(block('.main-actions-menu'), /width:\s*min\(210px,\s*calc\(100vw\s*-\s*16px\)\)/);
 });
@@ -66,16 +65,44 @@ test('loan cards make the user-entered name primary and open without a redundant
   assert.doesNotMatch(card, /class="loan-card-compact"[^>]*role="button"/);
   assert.doesNotMatch(card, /data-loan-type="\$\{loan\.loanType/);
   assert.doesNotMatch(card, /data-type="\$\{loan\.loanType/);
+  assert.doesNotMatch(card, /uncombine/);
+  assert.match(block('.loan-card-compact-open'), /height:\s*auto/);
+  assert.match(block('.loan-card-compact-open'), /margin:\s*0/);
 });
 
-test('all custom dropdown menus expose an explicit vertical scrollbar', () => {
-  assert.match(css, /\.dropdown-menu,[\s\S]*?\.profile-dropdown\s*\{[\s\S]*?overflow-y:\s*scroll/);
-  assert.match(css, /\.dropdown-menu,[\s\S]*?\.profile-dropdown\s*\{[\s\S]*?scrollbar-width:\s*auto/);
+test('uncombine is offered only inside the selected loan detail menu', () => {
+  const start = js.indexOf('showLoanDetail(index)');
+  const end = js.indexOf('getCurrentLoan()', start);
+  assert.match(js.slice(start, end), /data-action="uncombine"/);
+});
+
+test('custom dropdown menus only scroll when the viewport actually constrains them', () => {
+  const dropdownOverflow = css.match(/\.dropdown-menu,\s*\.loan-detail-menu,\s*\.main-actions-menu,\s*\.profile-dropdown\s*\{([^}]*)\}/)?.[1] || '';
+  assert.match(dropdownOverflow, /overflow-y:\s*auto/);
+  assert.doesNotMatch(dropdownOverflow, /overflow-y:\s*scroll/);
   assert.match(css, /select\s*\{[\s\S]*?scrollbar-width:\s*auto/);
-  assert.match(js, /menu\.style\.overflowY\s*=\s*"scroll"/);
+  assert.match(js, /menu\.style\.overflowY\s*=\s*"auto"/);
 });
 
 test('re-entering the application does not register duplicate menu listeners', () => {
   assert.match(js, /listenersInitialized:\s*false/);
   assert.match(js, /initializeEventListeners\(\)\s*\{\s*if \(this\.listenersInitialized\) return;\s*this\.listenersInitialized = true;/);
+});
+
+test('menu triggers toggle closed and outside clicks are consumed before other actions', () => {
+  assert.match(js, /function toggleDropdownMenu\(menu, trigger\)/);
+  assert.match(js, /const wasOpen = menu\.classList\.contains\("open"\);[\s\S]*?closeOpenMenus\(\);[\s\S]*?if \(wasOpen\) return false;/);
+  assert.match(js, /document\.addEventListener\("click", dismissOpenMenusOnOutsideClick, true\)/);
+  assert.match(js, /function dismissOpenMenusOnOutsideClick\(event\)[\s\S]*?event\.preventDefault\(\);[\s\S]*?event\.stopPropagation\(\);/);
+  assert.ok((js.match(/toggleDropdownMenu\(/g) || []).length >= 8);
+});
+
+test('all three-dot triggers share one compact borderless visual treatment', () => {
+  const controls = css.match(/\.main-actions-menu-btn,\s*\.overview-detail-menu-btn,\s*\.loan-detail-menu-btn,\s*\.loan-part-menu-btn,\s*\.payment-plan-menu-btn,\s*\.account-email-menu-btn\s*\{([^}]*)\}/)?.[1] || '';
+  assert.match(controls, /width:\s*34px/);
+  assert.match(controls, /height:\s*34px/);
+  assert.match(controls, /min-width:\s*0/);
+  assert.match(controls, /margin:\s*0/);
+  assert.match(controls, /border:\s*0/);
+  assert.match(controls, /background:\s*transparent/);
 });

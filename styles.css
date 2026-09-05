@@ -777,17 +777,34 @@ th, td {
 .loan-info-actions { display: flex; align-items: center; gap: 8px; }
 .loan-info-actions button { margin: 0; }
 .main-actions-menu-wrap { position: relative; }
-.main-actions-menu-btn {
+.main-actions-menu-btn,
+.overview-detail-menu-btn,
+.loan-detail-menu-btn,
+.loan-part-menu-btn,
+.payment-plan-menu-btn,
+.account-email-menu-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  min-width: 0;
+  height: 34px;
+  margin: 0;
   padding: 0;
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  background: var(--section-background);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: var(--text-color);
+  cursor: pointer;
+}
+.main-actions-menu-btn:hover, .main-actions-menu-btn:focus-visible,
+.overview-detail-menu-btn:hover, .overview-detail-menu-btn:focus-visible,
+.loan-detail-menu-btn:hover, .loan-detail-menu-btn:focus-visible,
+.loan-part-menu-btn:hover, .loan-part-menu-btn:focus-visible,
+.payment-plan-menu-btn:hover, .payment-plan-menu-btn:focus-visible,
+.account-email-menu-btn:hover, .account-email-menu-btn:focus-visible {
+  background: var(--input-background);
+  outline: none;
 }
 .main-actions-menu {
   position: absolute;
@@ -891,6 +908,8 @@ th, td {
 .loan-card-compact-open {
   flex: 1;
   min-width: 0;
+  height: auto;
+  margin: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -936,15 +955,6 @@ th, td {
   gap: 8px;
 }
 .loan-card-compact-actions .btn-open { padding: 8px 14px; font-size: 0.9rem; }
-.loan-detail-menu-btn {
-  padding: 6px;
-  border: none;
-  background: none;
-  color: var(--text-color);
-  cursor: pointer;
-  border-radius: 4px;
-}
-.loan-detail-menu-btn:hover { background: var(--input-background); }
 .loan-detail-menu {
   position: absolute;
   right: 0;
@@ -1110,12 +1120,39 @@ th, td {
   background: var(--input-background);
 }
 .loan-part-card-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.loan-part-card-heading { flex: 1; min-width: 0; }
 .loan-part-card-actions { display: flex; align-items: center; gap: 6px; }
 .loan-part-menu-wrap { position: relative; flex: 0 0 auto; }
-.loan-part-menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; color: var(--text-color); background: transparent; cursor: pointer; }
-.loan-part-menu-btn:hover, .loan-part-menu-btn:focus-visible { background: color-mix(in srgb, var(--primary-color) 12%, transparent); outline: none; }
-.loan-part-menu { right: 0; top: 36px; min-width: 170px; }
+.loan-part-menu-wrap:has(.dropdown-menu.open) { z-index: 100; }
+.loan-part-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  min-width: 170px;
+  background: var(--section-background);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px var(--card-shadow);
+  z-index: 10;
+  padding: 4px 0;
+  display: none;
+}
 .loan-part-menu.open { display: block; }
+.loan-part-menu button {
+  display: block;
+  width: 100%;
+  min-width: auto;
+  height: auto;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--text-color);
+  text-align: left;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.loan-part-menu button:hover { background: var(--input-background); }
 .loan-part-card-title { margin: 0; color: var(--text-color); font-size: 1rem; overflow-wrap: anywhere; }
 .loan-part-card-number { display: block; margin-bottom: 2px; color: var(--placeholder-color); font-size: 0.72rem; font-weight: 500; text-transform: uppercase; }
 .loan-part-card-balance { flex: 0 0 auto; color: var(--primary-color); font-size: 1rem; font-weight: 700; white-space: nowrap; }
@@ -1171,15 +1208,6 @@ th, td {
   margin-bottom: 4px;
 }
 .overview-detail-menu-wrap { position: relative; }
-.overview-detail-menu-btn {
-  padding: 6px;
-  border: none;
-  background: none;
-  color: var(--text-color);
-  cursor: pointer;
-  border-radius: 4px;
-}
-.overview-detail-menu-btn:hover { background: var(--input-background); }
 .overview-detail-menu.dropdown-menu {
   position: absolute;
   right: 0;
@@ -1230,15 +1258,6 @@ th, td {
 }
 .payment-plan-menu-wrap { position: relative; display: inline-block; }
 .payment-plan-menu-wrap:has(.dropdown-menu.open) { z-index: 100; }
-.payment-plan-menu-btn {
-  padding: 6px;
-  border: none;
-  background: none;
-  color: var(--text-color);
-  cursor: pointer;
-  border-radius: 4px;
-}
-.payment-plan-menu-btn:hover { background: var(--input-background); }
 .payment-plan-menu {
   position: absolute;
   right: 0;
@@ -1989,7 +2008,7 @@ th, td {
 .profile-dropdown {
   max-height: calc(100vh - 16px);
   overflow-x: hidden;
-  overflow-y: scroll;
+  overflow-y: auto;
   scrollbar-width: auto;
 }
 
@@ -2078,16 +2097,9 @@ select {
   border-radius: 4px;
 }
 .account-email-menu-btn {
-  background: none;
-  border: none;
-  padding: 4px 8px;
-  cursor: pointer;
-  color: var(--text-color);
   font-size: 18px;
   line-height: 1;
-  border-radius: 4px;
 }
-.account-email-menu-btn:hover { background: var(--input-background); }
 .account-email-menu {
   display: none;
   position: absolute;

@@ -6,6 +6,11 @@ const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const html = readFileSync(new URL("../app.html", import.meta.url), "utf8");
 const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
+function cssBlock(selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] || "";
+}
+
 test("editable part cards expose a three-dot open/edit action and a part-specific current-rate label", () => {
   assert.match(app, /loan-part-menu-btn/);
   assert.match(app, /data-action="edit-part"/);
@@ -13,6 +18,20 @@ test("editable part cards expose a three-dot open/edit action and a part-specifi
   assert.match(app, /PartEditorHandler\.open/);
   assert.match(app, /canEditParts\s*&&\s*!\(part\.refinancedBy\s*\|\|\s*\[\]\)\.length/);
   assert.match(css, /\.loan-part-menu-wrap/);
+});
+
+test("loan-part actions stay hidden in the three-dot menu until it is opened", () => {
+  assert.match(cssBlock(".loan-part-menu"), /position:\s*absolute/);
+  assert.match(cssBlock(".loan-part-menu"), /display:\s*none/);
+  assert.match(cssBlock(".loan-part-menu.open"), /display:\s*block/);
+  assert.match(cssBlock(".loan-part-menu button"), /background:\s*none/);
+  assert.match(cssBlock(".loan-part-menu button"), /width:\s*100%/);
+});
+
+test("loan-part titles retain their flex space beside the shared three-dot control", () => {
+  assert.match(app, /class="loan-part-card-heading"/);
+  assert.match(cssBlock(".loan-part-card-heading"), /flex:\s*1/);
+  assert.match(cssBlock(".loan-part-card-heading"), /min-width:\s*0/);
 });
 
 test("part editor supports all canonical fields, rate-history rows, cancellation, and validation feedback", () => {

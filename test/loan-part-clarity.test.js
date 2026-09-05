@@ -22,5 +22,5 @@ test('loan parts replace the redundant combined overview card', () => {
 
 test('viewport-positioned menus suppress accidental horizontal scrolling', () => {
   assert.match(app, /menu\.style\.overflowX\s*=\s*"hidden"/);
-  assert.match(app, /menu\.style\.overflowY\s*=\s*"scroll"/);
+  assert.match(app, /menu\.style\.overflowY\s*=\s*"auto"/);
 });

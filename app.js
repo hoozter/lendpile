@@ -135,7 +135,7 @@ function positionDropdownInViewport(menu, anchor) {
   menu.style.maxWidth = `${Math.max(0, window.innerWidth - gap * 2)}px`;
   menu.style.maxHeight = `${Math.max(120, window.innerHeight - gap * 2)}px`;
   menu.style.overflowX = "hidden";
-  menu.style.overflowY = "scroll";
+  menu.style.overflowY = "auto";
   const menuRect = menu.getBoundingClientRect();
   const maxLeft = Math.max(gap, window.innerWidth - menuRect.width - gap);
   const left = Math.min(Math.max(gap, anchorRect.right - menuRect.width), maxLeft);
@@ -145,6 +145,65 @@ function positionDropdownInViewport(menu, anchor) {
   menu.style.left = `${left}px`;
   menu.style.top = `${Math.max(gap, Math.min(top, window.innerHeight - menuRect.height - gap))}px`;
 }
+
+const OPEN_DROPDOWN_SELECTOR = [
+  ".main-actions-menu.open",
+  ".overview-detail-menu.open",
+  ".loan-detail-menu.open",
+  ".loan-part-menu.open",
+  ".payment-plan-menu.open",
+  ".change-item-menu.open",
+  ".account-email-menu.open",
+  ".profile-dropdown.open"
+].join(", ");
+
+const DROPDOWN_TRIGGER_SELECTOR = [
+  ".main-actions-menu-btn",
+  ".overview-detail-menu-btn",
+  ".loan-detail-menu-btn",
+  ".loan-part-menu-btn",
+  ".payment-plan-menu-btn",
+  ".change-item-menu-btn",
+  ".account-email-menu-btn",
+  ".profile-icon-btn"
+].join(", ");
+
+function closeOpenMenus() {
+  let closed = false;
+  document.querySelectorAll(OPEN_DROPDOWN_SELECTOR).forEach(menu => {
+    menu.classList.remove("open");
+    closed = true;
+  });
+  document.querySelectorAll(DROPDOWN_TRIGGER_SELECTOR).forEach(trigger => {
+    if (trigger.getAttribute("aria-expanded") === "true") trigger.setAttribute("aria-expanded", "false");
+  });
+  return closed;
+}
+
+function toggleDropdownMenu(menu, trigger) {
+  if (!menu || !trigger) return false;
+  const wasOpen = menu.classList.contains("open");
+  closeOpenMenus();
+  if (wasOpen) return false;
+  menu.classList.add("open");
+  trigger.setAttribute("aria-expanded", "true");
+  positionDropdownInViewport(menu, trigger);
+  return true;
+}
+
+function dismissOpenMenusOnOutsideClick(event) {
+  const openMenus = Array.from(document.querySelectorAll(OPEN_DROPDOWN_SELECTOR));
+  if (!openMenus.length || !(event.target instanceof Element)) return;
+  const openTriggers = Array.from(document.querySelectorAll(DROPDOWN_TRIGGER_SELECTOR))
+    .filter(trigger => trigger.getAttribute("aria-expanded") === "true");
+  if (openMenus.some(menu => menu.contains(event.target)) || openTriggers.some(trigger => trigger.contains(event.target))) return;
+  closeOpenMenus();
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+}
+
+document.addEventListener("click", dismissOpenMenusOnOutsideClick, true);
 
 /** Render persisted context for an interest or principal change safely. */
 function changeContextAttributes(change) {
@@ -1386,7 +1445,7 @@ async function updateUserHeader() {
     if (profileBtn) profileBtn.removeAttribute("title");
     const displayName = (user.user_metadata && user.user_metadata.display_name) ? String(user.user_metadata.display_name).trim() : '';
     emailEl.textContent = displayName || user.email;
-    document.getElementById("profile-dropdown").classList.remove("open");
+    closeOpenMenus();
     if (adminLink) adminLink.style.display = (await AuthService.isAdmin()) ? "" : "none";
     updateSaveToAccountBar();
   } else {
@@ -1742,15 +1801,12 @@ const UIHandler = {
     const mainActionsMenu = document.getElementById("main-actions-menu");
     mainActionsButton?.addEventListener("click", event => {
       event.stopPropagation();
-      const open = mainActionsMenu?.classList.toggle("open") || false;
-      mainActionsButton.setAttribute("aria-expanded", String(open));
-      if (open) positionDropdownInViewport(mainActionsMenu, mainActionsButton);
+      toggleDropdownMenu(mainActionsMenu, mainActionsButton);
     });
     mainActionsMenu?.addEventListener("click", event => {
       const item = event.target.closest("[data-main-action]");
       if (!item) return;
-      mainActionsMenu.classList.remove("open");
-      mainActionsButton?.setAttribute("aria-expanded", "false");
+      closeOpenMenus();
       const action = item.getAttribute("data-main-action");
       if (action === "settings") openSettings();
       else if (action === "combine") CombineLoansHandler.open();
@@ -1758,10 +1814,7 @@ const UIHandler = {
       else if (action === "data-management") openSettings("data-management-section");
     });
     document.getElementById("profile-account").addEventListener("click", async () => {
-      const pd = document.getElementById("profile-dropdown");
-      const pib = document.getElementById("profile-icon-btn");
-      if (pd) pd.classList.remove("open");
-      if (pib) pib.setAttribute("aria-expanded", "false");
+      closeOpenMenus();
       UIHandler.showModal("account-modal");
       await populateAccountSettings();
     });
@@ -2095,9 +2148,6 @@ const UIHandler = {
     const debtLabel = isLend ? LanguageService.translate("owedToYou") : LanguageService.translate("remainingDebt");
     const isShared = !!loan._shared;
     const typeLabel = (loan.loanType === "lend" ? LanguageService.translate("badgeLending") : LanguageService.translate("badgeBorrowing"));
-    const uncombineMenuItem = loan.combination?.sources?.length > 1
-      ? `<button type="button" role="menuitem" data-action="uncombine" data-loan-index="${index}">${LanguageService.translate("uncombineLoans")}</button>`
-      : "";
     const menuHtml = isShared
       ? `<div class="loan-detail-menu-wrap">
             <button type="button" class="loan-detail-menu-btn" data-loan-index="${index}" data-action="menu" aria-haspopup="true" aria-expanded="false">
@@ -2116,7 +2166,6 @@ const UIHandler = {
             <div class="loan-detail-menu" role="menu">
               <button type="button" role="menuitem" data-action="edit" data-loan-index="${index}">${LanguageService.translate("edit")}</button>
               <button type="button" role="menuitem" data-action="duplicate" data-loan-index="${index}">${LanguageService.translate("duplicate")}</button>
-              ${uncombineMenuItem}
               <button type="button" role="menuitem" data-action="delete" data-loan-index="${index}">${LanguageService.translate("delete")}</button>
             </div>
           </div>`;
@@ -2389,7 +2438,7 @@ const UIHandler = {
       return `
         <article class="loan-part-card" data-part-id="${escapeHtml(part.id)}">
           <div class="loan-part-card-header">
-            <div>
+            <div class="loan-part-card-heading">
               <span class="loan-part-card-number">${escapeHtml(LanguageService.translate("loanPart"))} ${i + 1}</span>
               <h5 class="loan-part-card-title">${escapeHtml(title)}</h5>
             </div>
@@ -4770,18 +4819,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("login-modal").style.display = "flex";
         document.body.style.overflow = "hidden";
       } else {
-        profileDropdown.classList.toggle("open");
-        profileIconBtn.setAttribute("aria-expanded", profileDropdown.classList.contains("open"));
-        positionDropdownInViewport(profileDropdown, profileIconBtn);
+        toggleDropdownMenu(profileDropdown, profileIconBtn);
       }
-    });
-    document.addEventListener("click", () => {
-      profileDropdown.classList.remove("open");
-      profileIconBtn.setAttribute("aria-expanded", "false");
     });
   }
   document.getElementById("profile-logout").addEventListener("click", async () => {
-    profileDropdown.classList.remove("open");
+    closeOpenMenus();
     await AuthService.signOut();
     sessionStorage.removeItem("offlineMode");
     StorageService.save("loanData", []);
@@ -4838,10 +4881,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const menuItem = e.target.closest(".account-email-menu [data-action]");
     if (menuBtn) {
       e.stopPropagation();
-      document.querySelectorAll(".account-email-menu.open").forEach(m => m.classList.remove("open"));
       const menu = menuBtn.nextElementSibling;
-      if (menu) menu.classList.toggle("open");
-      menuBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
+      toggleDropdownMenu(menu, menuBtn);
       return;
     }
     if (menuItem) {
@@ -4849,7 +4890,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const email = wrap?.getAttribute("data-email");
       const isDefault = wrap?.getAttribute("data-is-default") === "true";
       const action = menuItem.getAttribute("data-action");
-      document.querySelectorAll(".account-email-menu.open").forEach(m => m.classList.remove("open"));
+      closeOpenMenus();
       if (action === "change") {
         window._accountChangeEmailFor = email;
         window._accountChangeEmailIsPrimary = isDefault;
@@ -4885,9 +4926,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         })();
       }
     }
-  });
-  document.addEventListener("click", () => {
-    document.querySelectorAll(".account-email-menu.open").forEach(m => m.classList.remove("open"));
   });
   /* Account: change email inline – send verification */
   document.querySelector(".account-cancel-email-change")?.addEventListener("click", () => {
@@ -5388,18 +5426,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       const wrap = changeItemMenuBtn.closest(".change-item-menu-wrap");
       const menu = wrap && wrap.querySelector(".change-item-menu");
-      document.querySelectorAll(".change-item-menu.dropdown-menu").forEach(m => m.classList.remove("open"));
-      if (menu) menu.classList.toggle("open");
-      changeItemMenuBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
-      positionDropdownInViewport(menu, changeItemMenuBtn);
+      toggleDropdownMenu(menu, changeItemMenuBtn);
       return;
     }
     const changeItemMenuItem = e.target.closest(".change-item-menu-wrap button[data-action]");
     if (changeItemMenuItem) {
       e.stopPropagation();
       const wrap = changeItemMenuItem.closest(".change-item-menu-wrap");
-      const menu = wrap && wrap.querySelector(".change-item-menu");
-      if (menu) menu.classList.remove("open");
+      closeOpenMenus();
       const changeType = wrap ? wrap.getAttribute("data-change-type") : null;
       const itemIndex = wrap ? parseInt(wrap.getAttribute("data-item-index"), 10) : -1;
       const action = changeItemMenuItem.getAttribute("data-action");
@@ -5431,16 +5465,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (partMenuButton) {
       e.stopPropagation();
       const menu = partMenuButton.closest(".loan-part-menu-wrap")?.querySelector(".loan-part-menu");
-      document.querySelectorAll(".loan-part-menu.open").forEach(item => item.classList.remove("open"));
-      if (menu) menu.classList.toggle("open");
-      partMenuButton.setAttribute("aria-expanded", String(Boolean(menu?.classList.contains("open"))));
-      positionDropdownInViewport(menu, partMenuButton);
+      toggleDropdownMenu(menu, partMenuButton);
       return;
     }
     const partMenuItem = e.target.closest(".loan-part-menu [data-action]");
     if (partMenuItem) {
       e.stopPropagation();
-      partMenuItem.closest(".loan-part-menu")?.classList.remove("open");
+      closeOpenMenus();
       const partId = partMenuItem.getAttribute("data-part-id");
       if (partMenuItem.getAttribute("data-action") === "edit-part") PartEditorHandler.open(partId);
       else if (partMenuItem.getAttribute("data-action") === "refinance-part") RefinanceHandler.open({ loanIndex: UIHandler.currentDetailLoanIndex, partId });
@@ -5451,18 +5482,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       const wrap = overviewBtn.closest(".overview-detail-menu-wrap");
       const menu = wrap && wrap.querySelector(".overview-detail-menu");
-      document.querySelectorAll(".overview-detail-menu.dropdown-menu").forEach(m => m.classList.remove("open"));
-      if (menu) menu.classList.toggle("open");
-      overviewBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
-      positionDropdownInViewport(menu, overviewBtn);
+      toggleDropdownMenu(menu, overviewBtn);
       return;
     }
     const overviewItem = e.target.closest(".overview-detail-menu button[data-action]");
     if (overviewItem) {
       e.stopPropagation();
       const wrap = overviewItem.closest(".overview-detail-menu-wrap");
-      const menu = wrap && wrap.querySelector(".overview-detail-menu");
-      if (menu) menu.classList.remove("open");
+      closeOpenMenus();
       const index = wrap ? parseInt(wrap.getAttribute("data-loan-index"), 10) : null;
       const action = overviewItem.getAttribute("data-action");
       const isShared = wrap && wrap.getAttribute("data-shared") === "true";
@@ -5488,17 +5515,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       const wrap = loanCardMenuBtn.closest(".loan-detail-menu-wrap");
       const menu = wrap && wrap.querySelector(".loan-detail-menu");
-      document.querySelectorAll(".loan-detail-menu.open").forEach(m => m.classList.remove("open"));
-      if (menu) menu.classList.toggle("open");
-      loanCardMenuBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
-      positionDropdownInViewport(menu, loanCardMenuBtn);
+      toggleDropdownMenu(menu, loanCardMenuBtn);
       return;
     }
     const loanCardMenuItem = e.target.closest(".loan-detail-menu [data-action]");
     if (loanCardMenuItem) {
       e.stopPropagation();
-      const menu = loanCardMenuItem.closest(".loan-detail-menu");
-      if (menu) menu.classList.remove("open");
+      closeOpenMenus();
       const cardIndex = parseInt(loanCardMenuItem.getAttribute("data-loan-index"), 10);
       const merged = UIHandler._mergedLoansList || [];
       const item = merged[cardIndex];
@@ -5529,10 +5552,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       const wrap = paymentPlanBtn.closest(".payment-plan-menu-wrap");
       const menu = wrap && wrap.querySelector(".payment-plan-menu");
-      document.querySelectorAll(".payment-plan-menu.dropdown-menu").forEach(m => m.classList.remove("open"));
-      if (menu) menu.classList.toggle("open");
-      paymentPlanBtn.setAttribute("aria-expanded", menu && menu.classList.contains("open"));
-      positionDropdownInViewport(menu, paymentPlanBtn);
+      toggleDropdownMenu(menu, paymentPlanBtn);
       return;
     }
     const paymentPlanItem = e.target.closest(".payment-plan-menu button[data-action]");
@@ -5540,8 +5560,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       if (UIHandler.currentShare && UIHandler.currentShare.share?.permission === "view") return;
       const wrap = paymentPlanItem.closest(".payment-plan-menu-wrap");
-      const menu = wrap && wrap.querySelector(".payment-plan-menu");
-      if (menu) menu.classList.remove("open");
+      closeOpenMenus();
       const loanIndex = wrap ? parseInt(wrap.getAttribute("data-loan-index"), 10) : null;
       const paymentIndex = wrap ? parseInt(wrap.getAttribute("data-payment-index"), 10) : null;
       const action = paymentPlanItem.getAttribute("data-action");
@@ -5574,12 +5593,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!isNaN(loanIndex)) FormHandler.openAmortizationForm(loanIndex);
       return;
     }
-  });
-
-  document.addEventListener("click", (e) => {
-    if (e.target.closest(".overview-detail-menu-wrap, .payment-plan-menu-wrap, .change-item-menu-wrap, .loan-detail-menu-wrap, .main-actions-menu-wrap")) return;
-    document.querySelectorAll(".overview-detail-menu.dropdown-menu.open, .payment-plan-menu.dropdown-menu.open, .change-item-menu.dropdown-menu.open, .loan-detail-menu.open, .main-actions-menu.open").forEach(m => m.classList.remove("open"));
-    document.querySelectorAll(".overview-detail-menu-btn[aria-expanded=true], .payment-plan-menu-btn[aria-expanded=true], .change-item-menu-btn[aria-expanded=true], .loan-detail-menu-btn[aria-expanded=true], .main-actions-menu-btn[aria-expanded=true]").forEach(b => b.setAttribute("aria-expanded", "false"));
   });
 
   document.getElementById("confirm-delete-btn").addEventListener("click", async () => {
