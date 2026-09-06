@@ -51,7 +51,6 @@ Required Worker secrets:
 
 Optional Worker secrets:
 
-- `LENDPILE_ADMIN_EMAILS` — comma-separated admin recovery/bootstrap allowlist.
 - `ADMIN_SECRET` — API-key admin access.
 - `ADMIN_TOTP_SECRET` — base32 TOTP secret for API-key admin access.
 
@@ -98,9 +97,9 @@ When each preserved user signs up/signs in with the same email, the Worker claim
 Open `admin.html`. Admin access works with:
 
 - A signed-in Neon Auth user who is in `admin_users`.
-- A signed-in Neon Auth user whose email is in `LENDPILE_ADMIN_EMAILS`.
-- The first Neon Auth user when no active admin exists yet.
 - `ADMIN_SECRET`, optionally protected with `ADMIN_TOTP_SECRET`.
+
+Admin membership is fail-closed: account creation, account age, and email address never grant admin access. Add or remove signed-in administrators explicitly in `admin_users` using their Neon Auth user ID.
 
 ## Verification Checklist
 

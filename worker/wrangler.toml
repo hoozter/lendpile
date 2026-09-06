@@ -5,7 +5,6 @@
 #   npx wrangler secret put NEON_AUTH_URL
 #   npx wrangler secret put NEON_AUTH_JWKS_URL
 # Optional:
-#   npx wrangler secret put LENDPILE_ADMIN_EMAILS
 #   npx wrangler secret put ADMIN_SECRET
 #   npx wrangler secret put ADMIN_TOTP_SECRET
 

@@ -6,10 +6,11 @@
  *   NEON_AUTH_URL
  *   NEON_AUTH_JWKS_URL
  * Optional:
- *   LENDPILE_ADMIN_EMAILS, ADMIN_SECRET, ADMIN_TOTP_SECRET
+ *   ADMIN_SECRET, ADMIN_TOTP_SECRET
  */
 
 import { neon } from "@neondatabase/serverless";
+import { isAdminUser } from "./admin-authorization.mjs";
 import {
   normalizeShareOptions,
   requireAppliedShareAction,
@@ -141,36 +142,6 @@ async function adminAuthBySecret(req, env) {
   return verifyTotp(env.ADMIN_TOTP_SECRET, req.headers.get("X-Admin-TOTP") || "");
 }
 
-function configuredAdminEmails(env) {
-  return String(env.LENDPILE_ADMIN_EMAILS || "")
-    .split(",")
-    .map(email => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-async function isAdmin(user, env) {
-  if (!user) return false;
-  if (user.email && configuredAdminEmails(env).includes(user.email.toLowerCase())) {
-    await sql`INSERT INTO admin_users (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING`;
-    return true;
-  }
-  const activeAdmins = await sql`
-    SELECT au.user_id
-    FROM admin_users au
-    JOIN neon_auth."user" u ON u.id::text = au.user_id
-    LIMIT 1
-  `;
-  if (activeAdmins.length === 0) {
-    const firstUsers = await sql`SELECT id::text AS id FROM neon_auth."user" ORDER BY "createdAt" ASC, id ASC LIMIT 1`;
-    if (firstUsers[0]?.id === user.id) {
-      await sql`INSERT INTO admin_users (user_id) VALUES (${user.id}) ON CONFLICT (user_id) DO NOTHING`;
-      return true;
-    }
-  }
-  const rows = await sql`SELECT user_id FROM admin_users WHERE user_id = ${user.id}`;
-  return rows.length > 0;
-}
-
 function mergeLoanArrays(currentData, legacyData) {
   const merged = [];
   const seen = new Set();
@@ -242,7 +213,7 @@ async function claimLegacyDataForUser(user) {
 async function requireAdmin(req, env) {
   if (await adminAuthBySecret(req, env)) return { admin: true, user: null };
   const user = await getUser(req, env);
-  if (await isAdmin(user, env)) return { admin: true, user };
+  if (await isAdminUser(sql, user)) return { admin: true, user };
   return { admin: false, user };
 }
 
@@ -321,7 +292,7 @@ export default {
       if (user) await claimLegacyDataForUser(user);
 
       if (path === "/admin/me" && req.method === "GET") {
-        return json({ admin: await isAdmin(user, env) }, 200, origin);
+        return json({ admin: await isAdminUser(sql, user) }, 200, origin);
       }
 
       if (path === "/profile") {
