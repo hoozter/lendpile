@@ -991,8 +991,10 @@
           s.accrued = 0;
         }
       });
+      // Weight rates by principal, not the separate unpaid-interest liability.
+      const endingPrincipal = states.reduce((sum, state) => sum + state.balance, 0);
       const endingDebt=states.reduce((x,s)=>x+s.balance+s.accrued,0); const startingDebt=timeline.length ? timeline.at(-1).endingDebt : 0;
-      if (states.some(s=>s.active) || events.length) timeline.push({date:new Date(month),paymentDate:allocations[0]?.date || new Date(month),startingDebt,interestRate: endingDebt ? states.reduce((x,s)=>x+s.balance*partRate(s.part,periodEnd),0)/endingDebt : 0,changes,interest,payment,amortization,endingDebt,paymentAllocations:allocations,partBalances:states.filter(s=>s.active).map(s=>({partId:s.part.id,originalPrincipal:s.part.originalPrincipal,startDate:s.part.startDate,interestRate:partRate(s.part,periodEnd),balance:s.balance,accruedInterest:s.accrued,interest:s.monthInterest}))});
+      if (states.some(s=>s.active) || events.length) timeline.push({date:new Date(month),paymentDate:allocations[0]?.date || new Date(month),startingDebt,interestRate: endingPrincipal ? states.reduce((x,s)=>x+s.balance*partRate(s.part,periodEnd),0)/endingPrincipal : 0,changes,interest,payment,amortization,endingDebt,paymentAllocations:allocations,partBalances:states.filter(s=>s.active).map(s=>({partId:s.part.id,originalPrincipal:s.part.originalPrincipal,startDate:s.part.startDate,interestRate:partRate(s.part,periodEnd),balance:s.balance,accruedInterest:s.accrued,interest:s.monthInterest}))});
       if (close && periodEnd >= close) break; if (endingDebt <= .000001 && states.every(s=>s.active || parseDate(s.part.startDate)<end)) break; month=nextMonthStart(month);
     } return timeline;
   }

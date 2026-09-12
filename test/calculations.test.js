@@ -5,6 +5,24 @@ import "../calculations.js";
 
 const C = globalThis.LendpileCalculations;
 
+test("canonical displayed rate excludes unpaid interest from principal weights", () => {
+  for (const rates of [[2, 2], [2, 4]]) {
+    const loan = { dayCountConvention: "actual365", loanParts: rates.map((interestRate, index) => ({
+      id: `part-${index}`, originalPrincipal: index ? 30000 : 10000,
+      startDate: "2026-01-01", interestRate, compoundInterest: false,
+      interestChanges: []
+    })), payments: [], principalAdjustments: [] };
+    const rows = C.buildTimeline(loan);
+    assert.ok(rows.length > 2);
+    const expected = (10000 * rates[0] + 30000 * rates[1]) / 40000;
+    for (const row of rows) {
+      approx(row.interestRate, expected, 1e-10);
+    }
+    // Reporting must not change the actual daily interest calculation.
+    approx(rows[0].interest, 40000 * expected / 100 * 31 / 365, 1e-8);
+  }
+});
+
 function approx(actual, expected, tolerance = 0.01) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${actual} to be within ${tolerance} of ${expected}`);
 }
