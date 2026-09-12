@@ -23,7 +23,7 @@ test("secondary application actions live in the main overflow menu", () => {
   assert.match(html, /data-main-action="combine"/);
   assert.match(html, /data-main-action="data-management"/);
   assert.doesNotMatch(html, /id="combine-loans-btn"/);
-  assert.doesNotMatch(html, /id="profile-settings"/);
+  assert.match(html, /id="profile-settings"/);
 });
 
 test("combined-loan rendering relies on loan-part cards and retains loan notes", () => {

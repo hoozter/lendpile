@@ -1941,6 +1941,10 @@ const UIHandler = {
       UIHandler.populateExportLoansList();
       if (sectionId) requestAnimationFrame(() => document.getElementById(sectionId)?.focus({ preventScroll: false }));
     };
+    document.getElementById("profile-settings").addEventListener("click", () => {
+      closeOpenMenus();
+      openSettings();
+    });
     const mainActionsButton = document.getElementById("main-actions-menu-btn");
     const mainActionsMenu = document.getElementById("main-actions-menu");
     mainActionsButton?.addEventListener("click", event => {
