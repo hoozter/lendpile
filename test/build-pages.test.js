@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   deploymentVersion,
@@ -7,6 +8,8 @@ import {
   renderDeploymentConfig,
   stampDeploymentVersion,
 } from '../scripts/build-pages.js';
+
+const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 
 test('deploymentVersion prefers the Cloudflare Pages commit SHA', () => {
   assert.equal(
@@ -43,6 +46,13 @@ test('stampDeploymentVersion replaces existing asset version parameters', () => 
     stampDeploymentVersion(html, 'new'),
     '<script src="app.js?v=new"></script>'
   );
+});
+
+test('the update action bypasses a stale document cache and then cleans its temporary URL parameter', () => {
+  assert.match(appSource, /refreshUrl\.searchParams\.set\("_update", pendingVersion \|\| String\(Date\.now\(\)\)\)/);
+  assert.match(appSource, /window\.location\.replace\(refreshUrl\.href\)/);
+  assert.match(appSource, /loadedUrl\.searchParams\.delete\("_update"\)/);
+  assert.doesNotMatch(appSource, /update-available-refresh-btn"\)\?\.addEventListener\("click", \(\) => location\.reload\(\)\)/);
 });
 
 test('renderDeploymentConfig requires the authentication endpoint', () => {

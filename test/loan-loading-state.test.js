@@ -26,14 +26,14 @@ test("failed account reads are not converted into an empty account", () => {
   assert.doesNotMatch(loadData, /catch \(e\)[\s\S]*return \[\];/);
 });
 
-test("login shows loading before exposing the application", () => {
+test("login delegates owned-loan loading before closing the modal", () => {
   const login = bodyOf("onLoginSuccess");
-  const loadingAt = login.indexOf("UIHandler.showLoansLoading()");
+  const loadAt = login.indexOf("startAccountLoanLoad(user)");
   const closeAt = login.indexOf('document.getElementById("login-modal").style.display = "none"');
-  assert.notEqual(loadingAt, -1);
+  assert.notEqual(loadAt, -1);
   assert.notEqual(closeAt, -1);
-  assert.ok(loadingAt < closeAt, "loading state must be installed before the login modal closes");
-  assert.match(login, /catch \(error\)[\s\S]*UIHandler\.showLoanLoadError\(error\)/);
+  assert.ok(loadAt < closeAt, "account loading must begin before the login modal closes");
+  assert.match(app, /async function startAccountLoanLoad[\s\S]*?showLoanLoadError\(error\)/);
 });
 
 test("normal startup does not load account loans twice", () => {

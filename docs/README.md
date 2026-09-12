@@ -75,22 +75,7 @@ An open `app.html` tab checks its own document after 15 seconds and then every 6
 
 ## Preserving Existing Lendpile Users
 
-Lendpile has existing users that must be preserved. Existing app data has already been imported into Neon under legacy user IDs and will be claimed by email on first login.
-
-When `david@mailo.se` and `pamela@familj-sjodin.se` sign up/sign in with those same emails, the Worker rewrites their legacy app data and share references to their Neon Auth user IDs.
-
-### Existing Neon Project
-
-The existing Lendpile Neon database was reset to the current `neon/schema.sql` app schema and loaded with preserved account data.
-
-Current migrated state:
-
-- `legacy_user_map`: 2 users
-- `loan_data`: 2 user rows
-- `loan_shares`: 1 redeemed shared-loan row
-- `profiles`: 2 rows
-
-When each preserved user signs up/signs in with the same email, the Worker claims their old UUID-keyed data and rewrites ownership/share references to the new Neon Auth user ID.
+The legacy user-ID migration is completed. Preserved account data and share references are already stored under their Neon Auth user IDs. The Worker no longer performs login-time claiming or database rewrites.
 
 ## Admin
 

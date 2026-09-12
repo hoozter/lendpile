@@ -142,74 +142,6 @@ async function adminAuthBySecret(req, env) {
   return verifyTotp(env.ADMIN_TOTP_SECRET, req.headers.get("X-Admin-TOTP") || "");
 }
 
-function mergeLoanArrays(currentData, legacyData) {
-  const merged = [];
-  const seen = new Set();
-  for (const loan of [...(Array.isArray(currentData) ? currentData : []), ...(Array.isArray(legacyData) ? legacyData : [])]) {
-    const id = loan && loan.id ? String(loan.id) : "";
-    const key = id || JSON.stringify(loan);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(loan);
-  }
-  return merged;
-}
-
-async function claimLegacyDataForUser(user) {
-  if (!user?.id || !user?.email) return;
-  const maps = await sql`
-    SELECT old_user_id, email
-    FROM legacy_user_map
-    WHERE lower(email) = lower(${user.email})
-      AND (claimed_user_id IS NULL OR claimed_user_id = ${user.id})
-  `;
-  for (const map of maps) {
-    const oldUserId = map.old_user_id;
-    if (!oldUserId || oldUserId === user.id) {
-      await sql`
-        UPDATE legacy_user_map
-        SET claimed_user_id = ${user.id}, claimed_at = COALESCE(claimed_at, NOW())
-        WHERE old_user_id = ${oldUserId}
-      `;
-      continue;
-    }
-
-    const legacyRows = await sql`SELECT data FROM loan_data WHERE user_id = ${oldUserId}`;
-    const legacyData = legacyRows[0]?.data || [];
-    const currentRows = await sql`SELECT data FROM loan_data WHERE user_id = ${user.id}`;
-    const currentData = currentRows[0]?.data || [];
-    const mergedData = mergeLoanArrays(currentData, legacyData);
-
-    await sql`
-      INSERT INTO loan_data (user_id, data, updated_at)
-      VALUES (${user.id}, ${JSON.stringify(mergedData)}::jsonb, NOW())
-      ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-    `;
-    await sql`DELETE FROM loan_data WHERE user_id = ${oldUserId}`;
-    await sql`UPDATE loan_shares SET owner_id = ${user.id} WHERE owner_id = ${oldUserId}`;
-    await sql`UPDATE loan_shares SET recipient_id = ${user.id} WHERE recipient_id = ${oldUserId}`;
-    await sql`UPDATE loan_shares SET edit_requested_by = ${user.id} WHERE edit_requested_by = ${oldUserId}`;
-    await sql`
-      INSERT INTO admin_users (user_id)
-      SELECT ${user.id}
-      WHERE EXISTS (SELECT 1 FROM admin_users WHERE user_id = ${oldUserId})
-      ON CONFLICT (user_id) DO NOTHING
-    `;
-    await sql`DELETE FROM admin_users WHERE user_id = ${oldUserId}`;
-    await sql`
-      INSERT INTO profiles (user_id, email, updated_at)
-      VALUES (${user.id}, ${user.email}, NOW())
-      ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, updated_at = EXCLUDED.updated_at
-    `;
-    await sql`DELETE FROM profiles WHERE user_id = ${oldUserId}`;
-    await sql`
-      UPDATE legacy_user_map
-      SET claimed_user_id = ${user.id}, claimed_at = NOW()
-      WHERE old_user_id = ${oldUserId}
-    `;
-  }
-}
-
 async function requireAdmin(req, env) {
   if (await adminAuthBySecret(req, env)) return { admin: true, user: null };
   const user = await getUser(req, env);
@@ -289,7 +221,6 @@ export default {
       const user = await getUser(req, env);
       const adminRoute = path === "/admin/me" || path.startsWith("/admin/users");
       if (!user && !adminRoute) return json({ error: "Unauthorized" }, 401, origin);
-      if (user) await claimLegacyDataForUser(user);
 
       if (path === "/admin/me" && req.method === "GET") {
         return json({ admin: await isAdminUser(sql, user) }, 200, origin);

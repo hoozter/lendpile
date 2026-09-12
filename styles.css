@@ -1176,6 +1176,8 @@ th, td {
 .refinance-total { margin-top: 6px; border-top: 1px solid var(--input-border); font-weight: 700; }
 .loan-loading-state, .loan-load-error { padding: 28px 16px; text-align: center; color: var(--placeholder-color); }
 .loan-load-error .btn-primary { margin-top: 10px; }
+.loan-cache-refreshing { display: inline-block; margin: 4px 0; color: var(--placeholder-color); font-size: 0.8rem; }
+.loan-cache-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--input-border); border-radius: 8px; color: var(--placeholder-color); font-size: 0.9rem; }
 .overview-row {
   display: flex;
   justify-content: space-between;

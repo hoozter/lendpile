@@ -1,6 +1,6 @@
 # Lendpile
 
-**Version 0.2.1**
+**Version 0.2.3**
 
 A loan and amortization tracker. Plan what you borrow or lend, see schedules and charts, and optionally sign in to sync across devices.
 

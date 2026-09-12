@@ -6,6 +6,14 @@ const NEON_AUTH_URL = (window.NEON_AUTH_URL || "").replace(/\/$/, "");
 const LENDPILE_TOKEN_KEY = "lendpile_neon_token";
 const LENDPILE_PROFILE_KEY = "lendpile_profile_cache";
 const LENDPILE_SIGNED_OUT_KEY = "lendpile_signed_out";
+let authEpoch = 0;
+
+function beginAuthTransition() {
+  authEpoch += 1;
+  // Requests for a prior identity must become inert before its response arrives.
+  if (typeof AccountLoadState !== "undefined") AccountLoadState.invalidate();
+  return authEpoch;
+}
 
 if (!LENDPILE_API_URL || !NEON_AUTH_URL) {
   console.error("Lendpile: Missing Neon config. Set LENDPILE_API_URL and NEON_AUTH_URL in config.js.");
@@ -66,12 +74,15 @@ function currentSessionFromToken() {
 }
 async function loadNeonSession() {
   if (!NEON_AUTH_URL) return { error: new Error("Neon Auth URL not configured"), data: null };
-  if (hasExplicitSignOut()) {
-    clearStoredToken();
-    return { error: new Error("Signed out"), data: null };
-  }
+  if (hasExplicitSignOut()) return { error: new Error("Signed out"), data: null };
+  const requestEpoch = authEpoch;
+  const tokenAtStart = getStoredToken();
   const res = await fetch(`${NEON_AUTH_URL}/get-session`, { method: "GET", credentials: "include" });
   const body = (await res.json().catch(() => ({}))) || {};
+  // Do not revive a session after sign-out or overwrite a newer account.
+  if (requestEpoch !== authEpoch || hasExplicitSignOut() || getStoredToken() !== tokenAtStart) {
+    return { error: new Error("Superseded auth session response"), data: null };
+  }
   if (!res.ok || !body?.user) {
     clearStoredToken();
     return { error: new Error(body?.message || body?.error || "No active auth session"), data: null };
@@ -220,6 +231,77 @@ function changeTooltipMarkup(change, detail) {
   ].filter(Boolean).join("");
 }
 
+const AccountLoadState = {
+  generation: 0,
+  userId: null,
+  stale: false,
+  begin(userId) {
+    this.generation += 1;
+    this.userId = userId || null;
+    // First visits are read-only too: only this account's successful GET verifies data.
+    this.stale = true;
+    return { generation: this.generation, userId: this.userId };
+  },
+  invalidate() {
+    this.generation += 1;
+    this.userId = null;
+    this.stale = false;
+  },
+  isCurrent(load) {
+    return !!load && this.generation === load.generation && this.userId === load.userId
+      && currentSessionFromToken()?.user?.id === load.userId;
+  },
+  isStale() { return this.stale; },
+  isVerified(load) { return this.isCurrent(load) && !this.stale; },
+  requireVerified() {
+    const sessionUserId = currentSessionFromToken()?.user?.id || null;
+    return !this.stale && (!this.userId || this.userId === sessionUserId);
+  },
+  markStale(load) {
+    if (this.isCurrent(load)) this.stale = true;
+  },
+  markVerified(load) {
+    if (this.isCurrent(load)) this.stale = false;
+  }
+};
+
+const AccountCacheService = {
+  key(userId) { return `lendpile_account_loans:${userId}`; },
+  load(userId) {
+    if (!userId) return null;
+    try {
+      const snapshot = JSON.parse(localStorage.getItem(this.key(userId)) || "null");
+      return snapshot && Array.isArray(snapshot.data) ? snapshot : null;
+    } catch (error) {
+      console.warn("Unable to read account loan cache:", error);
+      return null;
+    }
+  },
+  save(userId, data) {
+    if (!userId || !Array.isArray(data)) return false;
+    try {
+      localStorage.setItem(this.key(userId), JSON.stringify({ data, savedAt: Date.now() }));
+      return true;
+    } catch (error) {
+      console.warn("Unable to save account loan cache:", error);
+      return false;
+    }
+  },
+  clear(userId) {
+    if (!userId) return false;
+    try { localStorage.removeItem(this.key(userId)); return true; }
+    catch (error) { console.warn("Unable to clear account loan cache:", error); return false; }
+  }
+};
+
+function withRequestTimeout(promise, milliseconds = 12000) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Account refresh timed out")), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /** Auth and user profile (display name, recovery email, MFA) */
 const AuthService = {
   async signIn(email, password) {
@@ -232,6 +314,7 @@ const AuthService = {
     });
     const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Login failed" };
+    beginAuthTransition();
     clearExplicitSignOut();
     const session = await loadNeonSession();
     if (session.error) return { success: false, error: session.error.message };
@@ -248,6 +331,7 @@ const AuthService = {
     });
     const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Signup failed" };
+    beginAuthTransition();
     clearExplicitSignOut();
     setCachedProfile({ display_name: displayName || "" });
     const session = await loadNeonSession();
@@ -275,14 +359,23 @@ const AuthService = {
     });
     const body = (await res.json().catch(() => ({}))) || {};
     if (!res.ok) return { success: false, error: body.message || body.error || "Could not verify email" };
+    beginAuthTransition();
     clearExplicitSignOut();
     const session = await loadNeonSession();
     await this.refreshProfile();
     return { success: true, data: session.error ? body : session.data };
   },
   async signOut() {
+    const userId = currentSessionFromToken()?.user?.id;
+    beginAuthTransition();
+    AccountCacheService.clear(userId);
+    StorageService?.clearAccountLoans?.();
     setExplicitSignOut();
     clearStoredToken();
+    UIHandler.sharesReceived = [];
+    UIHandler.currentShare = null;
+    UIHandler.currentDetailLoanIndex = null;
+    UIHandler.showLoanList();
     try {
       if (NEON_AUTH_URL) {
         await fetch(`${NEON_AUTH_URL}/sign-out`, {
@@ -359,10 +452,19 @@ const AuthService = {
 const SyncService = {
   async syncData() {
     try {
-      const user = await AuthService.getUser();
-      if (!user) return;
+      // Capture identity before an await so an account switch cannot send this payload.
+      const session = currentSessionFromToken();
+      const user = session?.user;
+      const token = getStoredToken();
+      const epoch = authEpoch;
+      const load = { generation: AccountLoadState.generation, userId: user?.id || null };
+      const stillCurrent = () => authEpoch === epoch && getStoredToken() === token && AccountLoadState.isCurrent(load);
+      if (!user || !AccountLoadState.requireVerified() || !stillCurrent()) throw new Error(LanguageService.translate("cachedLoansReadOnly"));
       const loanData = StorageService.load("loanData");
+      if (!stillCurrent()) throw new Error(LanguageService.translate("cachedLoansReadOnly"));
       await apiFetch("/loan-data", { method: "PUT", body: JSON.stringify({ data: loanData }) });
+      if (!stillCurrent()) throw new Error("Account changed while saving loans");
+      AccountCacheService.save(user.id, loanData);
     } catch (e) {
       console.error('Sync failed:', e);
       throw e;
@@ -383,6 +485,9 @@ const SyncService = {
 
 /** Create and redeem share links; update shared loan when recipient has edit permission */
 const ShareService = {
+  staleCacheError() {
+    return { error: LanguageService.translate("cachedLoansReadOnly") };
+  },
   async getSharePreview(token) {
     if (!LENDPILE_API_URL) return { error: "Lendpile API not configured." };
     try {
@@ -393,6 +498,7 @@ const ShareService = {
     } catch (e) { return { error: e.message || "Link expired or invalid." }; }
   },
   async createShare(loan, options) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     const user = await AuthService.getUser();
     if (!user) return { error: "You must be signed in to share a loan." };
     try {
@@ -402,6 +508,7 @@ const ShareService = {
     } catch (e) { return { error: e.message }; }
   },
   async redeemShare(token) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     try {
       const body = await apiFetch(`/shares/redeem/${encodeURIComponent(token)}`, { method: "POST" });
       if (!body.share) return { error: "Link expired or invalid." };
@@ -409,6 +516,7 @@ const ShareService = {
     } catch (e) { return { error: e.message }; }
   },
   async updateSharedLoan(token, loan) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     try {
       const body = await apiFetch(`/shares/${encodeURIComponent(token)}/loan`, { method: "PUT", body: JSON.stringify({ loan }) });
       return { ok: body.ok === true };
@@ -423,14 +531,17 @@ const ShareService = {
     catch (e) { return { error: e.message, shares: [] }; }
   },
   async revokeShare(shareId) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     try { await apiFetch(`/shares/id/${encodeURIComponent(shareId)}`, { method: "DELETE" }); return { ok: true }; }
     catch (e) { return { error: e.message }; }
   },
   async revokeShareAsRecipient(token) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     try { await apiFetch(`/shares/token/${encodeURIComponent(token)}`, { method: "DELETE" }); return { ok: true }; }
     catch (e) { return { error: e.message }; }
   },
   async updateShare(shareId, updates) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     try { await apiFetch(`/shares/id/${encodeURIComponent(shareId)}`, { method: "PUT", body: JSON.stringify(updates || {}) }); return { ok: true }; }
     catch (e) { return { error: e.message }; }
   },
@@ -447,6 +558,7 @@ const ShareService = {
   async declineTransfer(shareId) { return this.shareAction(shareId, "decline-transfer"); },
   async cancelTransferRequest(shareId) { return this.shareAction(shareId, "cancel-transfer"); },
   async shareAction(shareId, action) {
+    if (!AccountLoadState.requireVerified()) return this.staleCacheError();
     try { const body = await apiFetch(`/shares/id/${encodeURIComponent(shareId)}/${action}`, { method: "POST" }); return { ok: body.ok === true }; }
     catch (e) { return { error: e.message }; }
   }
@@ -483,7 +595,10 @@ const LanguageService = {
       noteSaved: 'Anteckningen sparades.',
       noNotes: 'Inga anteckningar ännu.',
       loadingLoans: 'Laddar dina lån…',
-      loanLoadFailed: 'Det gick inte att läsa in dina lån.',
+      loanLoadFailed: 'Dina lån kunde inte laddas.',
+      cachedLoansRefreshing: 'Uppdaterar…',
+      cachedLoansRefreshFailed: 'Kunde inte uppdatera. Visar senast sparade uppgifter.',
+      cachedLoansReadOnly: 'Dina sparade lån uppdateras fortfarande och kan inte ändras ännu.',
       retry: 'Försök igen',
       editLoanPart: 'Redigera lånedel',
       openAndEdit: 'Öppna och redigera',
@@ -935,6 +1050,9 @@ const LanguageService = {
       noNotes: 'No notes yet.',
       loadingLoans: 'Loading your loans…',
       loanLoadFailed: 'Your loans could not be loaded.',
+      cachedLoansRefreshing: 'Refreshing…',
+      cachedLoansRefreshFailed: 'Could not refresh. Showing your last saved data.',
+      cachedLoansReadOnly: 'Your saved loans are still refreshing and cannot be changed yet.',
       retry: 'Retry',
       editLoanPart: 'Edit loan part',
       openAndEdit: 'Open and edit',
@@ -1401,6 +1519,15 @@ const LanguageService = {
  ********************************************************/
 const StorageService = {
   save(key, data) {
+    if (key === "loanData" && !AccountLoadState.requireVerified()) return false;
+    const saved = this.saveAuthoritative(key, data);
+    if (saved && key === "loanData" && !currentSessionFromToken()) {
+      this.saveAuthoritative("lendpile_guest_loans", data);
+    }
+    return saved;
+  },
+  saveAuthoritative(key, data, load = null) {
+    if (key === "loanData" && load && !AccountLoadState.isCurrent(load)) return false;
     try {
       // Persist only the canonical facility schema. Loading an old browser or
       // account snapshot therefore performs the focused one-time migration on
@@ -1427,6 +1554,9 @@ const StorageService = {
       console.error("Error loading data:", e);
       return [];
     }
+  },
+  clearAccountLoans() {
+    try { localStorage.removeItem("loanData"); } catch (_) {}
   }
 };
 
@@ -1755,6 +1885,20 @@ function formatDayCountConventionSummary(value) {
 /********************************************************
  * 4. UI HANDLER
  ********************************************************/
+// Cached cards may be read, but editing must not begin against an unverified view.
+function blockUnverifiedLoanEdit(event) {
+  if (AccountLoadState.requireVerified()) return;
+  const target = event.target;
+  if (!target?.closest) return;
+  if (target.closest("#add-loan-btn, #btn-import-data, #btn-import-file, [data-action]:not([data-action='open']):not([data-action='menu']), #loan-form-modal, #amortization-form, #loan-note-form, #loan-part-form, #combine-loans-form")) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}
+for (const event of ["click", "submit", "change"]) {
+  document.addEventListener(event, blockUnverifiedLoanEdit, true);
+}
+
 const UIHandler = {
   listenersInitialized: false,
   init() {
@@ -2102,6 +2246,23 @@ const UIHandler = {
     if (summary) summary.innerHTML = "";
     if (list) list.innerHTML = `<p class="loan-loading-state" role="status">${escapeHtml(LanguageService.translate("loadingLoans"))}</p>`;
   },
+  showCachedLoans(loans) {
+    StorageService.saveAuthoritative("loanData", loans);
+    this.sharesReceived = [];
+    this.init();
+    const list = document.getElementById("loans-list");
+    if (list && !list.querySelector(".loan-cache-refreshing")) {
+      list.insertAdjacentHTML("afterbegin", `<p class="loan-cache-refreshing" data-cache-refreshing role="status">${escapeHtml(LanguageService.translate("cachedLoansRefreshing"))}</p>`);
+    }
+  },
+  showCachedLoanLoadError(error) {
+    const list = document.getElementById("loans-list");
+    if (!list) return;
+    const notice = `<div class="loan-cache-error" role="alert"><span>${escapeHtml(LanguageService.translate("cachedLoansRefreshFailed"))}</span><button type="button" class="btn-secondary retry-cached-loan-load">${escapeHtml(LanguageService.translate("retry"))}</button></div>`;
+    list.insertAdjacentHTML("afterbegin", notice);
+    list.querySelector(".retry-cached-loan-load")?.addEventListener("click", () => onLoginSuccess({ retry: true }));
+    console.error("Cached account loan refresh failed:", error);
+  },
   showLoanLoadError(error) {
     const summary = document.getElementById("list-summary");
     const list = document.getElementById("loans-list");
@@ -2147,6 +2308,9 @@ const UIHandler = {
     const loanType = isLend ? "lend" : "borrow";
     const debtLabel = isLend ? LanguageService.translate("owedToYou") : LanguageService.translate("remainingDebt");
     const isShared = !!loan._shared;
+    const cacheNotice = !isShared && AccountLoadState.isStale()
+      ? `<span class="loan-cache-refreshing" data-cache-refreshing="true">${escapeHtml(LanguageService.translate("cachedLoansRefreshing"))}</span>`
+      : "";
     const typeLabel = (loan.loanType === "lend" ? LanguageService.translate("badgeLending") : LanguageService.translate("badgeBorrowing"));
     const menuHtml = isShared
       ? `<div class="loan-detail-menu-wrap">
@@ -2175,6 +2339,7 @@ const UIHandler = {
           <div class="loan-card-compact-info">
             <h3>${escapeHtml(loan.name)}</h3>
             <span class="loan-card-type-badge" data-type="${loanType}">${escapeHtml(typeLabel)}</span>
+            ${cacheNotice}
             <div class="loan-card-compact-meta">
               <span>${debtLabel}: ${UIHandler.formatCurrency(currentDebt, loan.currency)}</span>
               <span>${LanguageService.translate("monthsRemaining")}: ${monthsRemaining}</span>
@@ -4652,11 +4817,17 @@ const ConfirmHandler = {
 document.addEventListener("DOMContentLoaded", async () => {
   LanguageService.init();
   (function setupVersionCheck() {
+    const loadedUrl = new URL(window.location.href);
+    if (loadedUrl.searchParams.has("_update")) {
+      loadedUrl.searchParams.delete("_update");
+      window.history.replaceState(null, "", loadedUrl.pathname + loadedUrl.search + loadedUrl.hash);
+    }
     const meta = document.querySelector('meta[name="app-version"]');
     const current = meta ? (meta.getAttribute("content") || "").trim() : "";
     if (!current) return;
     const url = window.location.origin + window.location.pathname;
     let updateModalShown = false;
+    let pendingVersion = "";
     function checkNewVersion() {
       if (sessionStorage.getItem("offlineMode") || updateModalShown) return;
       fetch(url + "?_v=" + Date.now(), { cache: "no-store" })
@@ -4665,16 +4836,21 @@ document.addEventListener("DOMContentLoaded", async () => {
           const m = html.match(/<meta\s+name="app-version"\s+content="([^"]*)"/);
           const serverVer = m ? (m[1] || "").trim() : "";
           if (serverVer && serverVer !== current) {
+            pendingVersion = serverVer;
             updateModalShown = true;
             UIHandler.showModal("update-available-modal");
           }
         })
         .catch(() => {});
     }
+    document.getElementById("update-available-refresh-btn")?.addEventListener("click", () => {
+      const refreshUrl = new URL(window.location.href);
+      refreshUrl.searchParams.set("_update", pendingVersion || String(Date.now()));
+      window.location.replace(refreshUrl.href);
+    });
     setInterval(checkNewVersion, 60000);
     setTimeout(checkNewVersion, 15000);
   })();
-  document.getElementById("update-available-refresh-btn")?.addEventListener("click", () => location.reload());
   const searchParams = new URLSearchParams(window.location.search);
   const shareFromUrl = searchParams.get("share") || null;
   window._pendingShareToken = shareFromUrl;
@@ -4753,18 +4929,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("mfa-challenge-feedback").className = "";
       UIHandler.showModal("mfa-challenge-modal");
       window._mfaChallengeResolve = async () => {
-        UIHandler.showLoansLoading();
-        let syncedData;
-        try {
-          syncedData = await SyncService.loadData();
-        } catch (error) {
-          UIHandler.showLoanLoadError(error);
-          return;
-        }
-        StorageService.save("loanData", syncedData ?? []);
-        const { shares: sharesReceived } = await ShareService.listSharesReceived();
-        UIHandler.sharesReceived = sharesReceived || [];
-        UIHandler.init();
+        await onLoginSuccess();
         await updateUserHeader();
         await tryRedeemPendingShare();
         if (window._emailJustVerified) {
@@ -4785,19 +4950,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const user = await AuthService.getUser();
     if (user) {
-      UIHandler.showLoansLoading();
-      try {
-        const syncedData = await SyncService.loadData();
-        StorageService.save("loanData", syncedData ?? []);
-      } catch (error) {
-        initialLoanLoadError = error;
-      }
-      const { shares: sharesReceived } = await ShareService.listSharesReceived();
-      UIHandler.sharesReceived = sharesReceived || [];
+      void startAccountLoanLoad(user);
     } else {
+      AccountLoadState.invalidate();
+      StorageService.clearAccountLoans();
       UIHandler.sharesReceived = [];
+      UIHandler.init();
     }
-    UIHandler.init();
     if (initialLoanLoadError) UIHandler.showLoanLoadError(initialLoanLoadError);
     await updateUserHeader();
     await updateOfflineBanner();
@@ -5801,57 +5960,89 @@ async function tryRedeemPendingShare() {
     UIHandler.showSharedLoan();
   }
 }
-async function finishLoginSuccess(loanDataToUse) {
-  StorageService.save("loanData", loanDataToUse ?? []);
-  const { shares: sharesReceived } = await ShareService.listSharesReceived();
-  UIHandler.sharesReceived = sharesReceived || [];
-  UIHandler.init();
-  await updateUserHeader();
-  await updateOfflineBanner();
-  await tryRedeemPendingShare();
-  UIHandler.checkTransferOffers();
-  UIHandler.checkEditRequests();
-  UIHandler.checkEditResolutionBanner();
+async function refreshSharesForAccount(load) {
+  try {
+    const { shares } = await ShareService.listSharesReceived();
+    if (!AccountLoadState.isCurrent(load)) return;
+    UIHandler.sharesReceived = shares || [];
+    // Shares must not replace an owned-loan loading/error state or interrupt editing.
+    if (AccountLoadState.isVerified(load) && UIHandler.currentShare == null && UIHandler.currentDetailLoanIndex == null) {
+      UIHandler.renderLoans();
+    }
+  } catch (error) {
+    // Shared loans are supplementary: never delay or replace the owner's loans.
+    console.error("Unable to refresh shared loans:", error);
+  }
+}
+
+async function startAccountLoanLoad(user) {
+  const load = AccountLoadState.begin(user.id);
+  const cached = AccountCacheService.load(user.id);
+  // Start the source-of-truth request before rendering cache or supplementary work.
+  // apiFetch starts the authenticated GET synchronously while the current token is intact.
+  const loanPromise = withRequestTimeout(apiFetch("/loan-data", { method: "GET" }).then(body => body && body.data != null ? body.data : []));
+  // A shared browser key must never expose the preceding account while this GET resolves.
+  StorageService.clearAccountLoans();
+  if (cached) {
+    AccountLoadState.markStale(load);
+    UIHandler.showCachedLoans(cached.data);
+  } else {
+    // This is deliberately after auth restoration: first visits never imply old data is fresh.
+    UIHandler.showLoansLoading();
+  }
+  // Shares start only after the authoritative request is already in flight.
+  const sharesPromise = refreshSharesForAccount(load);
+  try {
+    const syncedData = await loanPromise;
+    if (!AccountLoadState.isCurrent(load)) return { ignored: true, sharesPromise };
+    const data = syncedData ?? [];
+    StorageService.saveAuthoritative("loanData", data, load);
+    if (AccountLoadState.isCurrent(load)) AccountCacheService.save(user.id, data);
+    AccountLoadState.markVerified(load);
+    if (cached) UIHandler.renderLoans();
+    else UIHandler.init();
+    return { data, sharesPromise };
+  } catch (error) {
+    if (!AccountLoadState.isCurrent(load)) return { ignored: true, sharesPromise };
+    if (cached) UIHandler.showCachedLoanLoadError(error);
+    else UIHandler.showLoanLoadError(error);
+    return { error, sharesPromise };
+  }
 }
 
 async function onLoginSuccess() {
-  UIHandler.showLoansLoading();
+  sessionStorage.removeItem("offlineMode");
+  const user = await AuthService.getUser();
+  if (!user) return;
+  // This synchronously renders cached cards or the loading state before the modal closes.
+  const accountLoad = startAccountLoanLoad(user);
   document.getElementById("login-modal").style.display = "none";
   UIHandler.restoreBodyScroll();
-  sessionStorage.removeItem("offlineMode");
-  const localLoans = StorageService.load("loanData") || [];
-  let syncedData;
-  try {
-    syncedData = await SyncService.loadData();
-  } catch (error) {
-    UIHandler.showLoanLoadError(error);
-    return;
-  }
-  const serverEmpty = !syncedData || syncedData.length === 0;
-  if (localLoans.length > 0 && serverEmpty) {
-    const n = localLoans.length;
-    const msg = (LanguageService.translate("localLoansAddToAccountMessage") || "You have {n} loan(s) on this device that aren't in your account. Add them to your account?")
-      .replace("{n}", String(n));
-    UIHandler.showConfirmModal({
-      title: LanguageService.translate("localLoansAddToAccountTitle") || "Add device loans to your account?",
-      message: msg,
-      confirmLabel: LanguageService.translate("addToMyAccount") || "Add to my account",
-      cancelLabel: LanguageService.translate("discardUseAccount") || "Discard and use account",
-      confirmClass: "btn-primary",
-      onConfirm: async () => {
-        UIHandler.cancelGenericConfirm();
-        await SyncService.syncData();
-        const after = await SyncService.loadData();
-        await finishLoginSuccess(after);
-      },
-      onCancel: async () => {
-        UIHandler.cancelGenericConfirm();
-        await finishLoginSuccess(syncedData ?? []);
-      }
-    });
-    return;
-  }
-  await finishLoginSuccess(syncedData ?? []);
+  void updateUserHeader();
+  void updateOfflineBanner();
+  const load = { generation: AccountLoadState.generation, userId: user.id };
+  await accountLoad;
+  if (!AccountLoadState.isVerified(load)) return;
+  void tryRedeemPendingShare();
+  const guestLoans = StorageService.load("lendpile_guest_loans");
+  if (!Array.isArray(guestLoans) || !guestLoans.length || StorageService.load("loanData").length) return;
+  UIHandler.showConfirmModal({
+    title: LanguageService.translate("localLoansAddToAccountTitle"),
+    message: LanguageService.translate("localLoansAddToAccountMessage").replace("{n}", String(guestLoans.length)),
+    confirmLabel: LanguageService.translate("addToMyAccount"),
+    cancelLabel: LanguageService.translate("discardUseAccount"),
+    confirmClass: "btn-primary",
+    onConfirm: async () => {
+      UIHandler.cancelGenericConfirm();
+      if (!AccountLoadState.isVerified(load) || StorageService.load("loanData").length) return;
+      if (!StorageService.save("loanData", guestLoans)) return;
+      await SyncService.syncData();
+      if (!AccountLoadState.isVerified(load)) return;
+      localStorage.removeItem("lendpile_guest_loans");
+      UIHandler.renderLoans();
+    },
+    onCancel: () => UIHandler.cancelGenericConfirm()
+  });
 }
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -5932,6 +6123,7 @@ document.getElementById("mfa-challenge-close")?.addEventListener("click", async 
 
 document.getElementById("work-offline-btn").addEventListener("click", () => {
   sessionStorage.setItem("offlineMode", "true");
+  StorageService.saveAuthoritative("loanData", StorageService.load("lendpile_guest_loans"));
   document.getElementById("login-modal").style.display = "none";
   UIHandler.restoreBodyScroll();
   LanguageService.init();
