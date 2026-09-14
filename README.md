@@ -18,7 +18,7 @@ A loan and amortization tracker. Plan what you borrow or lend, see schedules and
 ## Quick start
 
 1. **Clone** the repo.
-2. **Config (for sync):** Copy `config.example.js` → `config.js`, add `LENDPILE_API_URL` and `NEON_AUTH_URL`. (`config.js` is gitignored.)
+2. **Config (for sync):** Copy `config.example.js` → `config.js`, set `LENDPILE_API_URL` and keep `NEON_AUTH_URL` as `/auth`. Run Pages Functions with the upstream `NEON_AUTH_URL` runtime binding; see `docs/README.md`. (`config.js` is gitignored.)
 3. **Serve** the app (e.g. `npx serve .`) and open `/` for landing or `/app.html` for the app.
 4. **Neon:** Enable Neon Auth, run `neon/schema.sql`, deploy the Worker, and add your local/deployed origins to Neon Auth trusted origins.
 

@@ -4,7 +4,8 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  rmSync,
+  renameSync,
+  mkdtempSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -81,7 +82,8 @@ function requiredEndpoint(value, name) {
 
 export function renderDeploymentConfig(env = process.env) {
   const apiUrl = productionApiUrl;
-  const authUrl = requiredEndpoint(env.NEON_AUTH_URL, 'NEON_AUTH_URL');
+  requiredEndpoint(env.NEON_AUTH_URL, 'NEON_AUTH_URL');
+  const authUrl = '/auth';
 
   return `// Generated at build time. Do not edit in dist.\nwindow.LENDPILE_API_URL = ${JSON.stringify(apiUrl)};\nwindow.NEON_AUTH_URL = ${JSON.stringify(authUrl)};\nwindow.ADMIN_API_URL = ${JSON.stringify(apiUrl)};\n`;
 }
@@ -89,7 +91,13 @@ export function renderDeploymentConfig(env = process.env) {
 export function buildPages(env = process.env) {
   const config = renderDeploymentConfig(env);
 
-  rmSync(outDir, { recursive: true, force: true });
+  if (existsSync(outDir)) {
+    const archiveRoot = join(root, '..', 'build-archive');
+    mkdirSync(archiveRoot, { recursive: true });
+    const archive = mkdtempSync(join(archiveRoot, 'pages-'));
+    renameSync(outDir, join(archive, 'dist'));
+    console.log(`Archived prior Pages bundle in ${archive}/dist`);
+  }
   mkdirSync(outDir, { recursive: true });
 
   const sourceAppHtml = readFileSync(join(root, 'app.html'), 'utf8');
@@ -98,8 +106,8 @@ export function buildPages(env = process.env) {
   for (const file of publicFiles) {
     const source = join(root, file);
     if (!existsSync(source)) continue;
-    if (file === 'app.html') {
-      writeFileSync(join(outDir, file), stampDeploymentVersion(sourceAppHtml, version));
+    if (file === 'app.html' || file === 'admin.html') {
+      writeFileSync(join(outDir, file), stampDeploymentVersion(readFileSync(source, 'utf8'), version));
     } else {
       copyFileSync(source, join(outDir, file));
     }

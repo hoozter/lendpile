@@ -79,7 +79,8 @@ test('renderDeploymentConfig emits the canonical browser config names', () => {
   });
 
   assert.match(config, /window\.LENDPILE_API_URL = "https:\/\/api\.lendpile\.com";/);
-  assert.match(config, /window\.NEON_AUTH_URL = "https:\/\/auth\.example\.test\/neondb\/auth";/);
+  assert.match(config, /window\.NEON_AUTH_URL = "\/auth";/);
+  assert.doesNotMatch(config, /auth\.example\.test/);
   assert.match(config, /window\.ADMIN_API_URL = "https:\/\/api\.lendpile\.com";/);
   assert.doesNotMatch(config, /window\.API_URL/);
 });
@@ -99,4 +100,15 @@ test('renderDeploymentConfig rejects credentials in public endpoints', () => {
     }),
     /must not contain credentials/
   );
+});
+
+test('app and admin resolve the generated auth config to their own origin', async () => {
+  const { default: vm } = await import('node:vm');
+  const config = renderDeploymentConfig({ NEON_AUTH_URL: 'https://auth.example.test/neondb/auth' });
+  for (const [file, declaration, name] of [['app.js', /^const NEON_AUTH_URL = .*;$/m, 'NEON_AUTH_URL'], ['admin.html', /const neonAuthUrl = .*;/, 'neonAuthUrl']]) {
+    const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+    const context = { window: {} };
+    vm.runInNewContext(config + '\n' + source.match(declaration)[0] + `\nglobalThis.result = ${name};`, context);
+    assert.equal(new URL(context.result + '/get-session', 'https://lendpile.com').href, 'https://lendpile.com/auth/get-session');
+  }
 });

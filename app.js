@@ -334,8 +334,14 @@ const AuthService = {
     beginAuthTransition();
     clearExplicitSignOut();
     setCachedProfile({ display_name: displayName || "" });
-    const session = await loadNeonSession();
-    return { success: true, data: session.error ? { user: body.user || null, session: null, needsVerification: true } : session.data };
+    if (body.user?.emailVerified === false) {
+      return { success: true, data: { user: body.user, session: null, needsVerification: true } };
+    }
+    const session = await loadNeonSession().catch(() => null);
+    if (session?.error || !session?.data?.session) {
+      return { success: false, error: "Account created, but no active session was returned. Please sign in." };
+    }
+    return { success: true, data: session.data };
   },
   async resendSignupOtp(email) {
     if (!NEON_AUTH_URL) return { success: false, error: "Neon Auth not configured." };
@@ -361,9 +367,12 @@ const AuthService = {
     if (!res.ok) return { success: false, error: body.message || body.error || "Could not verify email" };
     beginAuthTransition();
     clearExplicitSignOut();
-    const session = await loadNeonSession();
+    const session = await loadNeonSession().catch(() => null);
+    if (session?.error || !session?.data?.session) {
+      return { success: false, error: "Email verified, but no active session was returned. Please sign in." };
+    }
     await this.refreshProfile();
-    return { success: true, data: session.error ? body : session.data };
+    return { success: true, data: session.data };
   },
   async signOut() {
     const userId = currentSessionFromToken()?.user?.id;

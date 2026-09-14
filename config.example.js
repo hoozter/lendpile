@@ -4,7 +4,7 @@
  * config.js is gitignored. Never expose NEON_DATABASE_URL in browser config.
  */
 window.LENDPILE_API_URL = "https://your-worker.workers.dev";
-window.NEON_AUTH_URL = "https://your-neon-auth-host/neondb/auth";
+window.NEON_AUTH_URL = "/auth";
 
 /**
  * Account deletion and admin API use the same Worker.
